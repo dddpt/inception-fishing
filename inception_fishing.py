@@ -2,11 +2,8 @@
 
 from os import listdir, path
 
-from lxml import etree, objectify
-
 # %%
-
-DEFAULT_NAMED_ENTITY_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
+INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
 
 
 def get_attributes_string(class_name, object_dict):
@@ -24,6 +21,7 @@ class Corpus:
         self.documents = documents
     @staticmethod
     def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None):
+        """Returns a Corpus object from a lxml.etree tag (the root of an EF evaluation XML output) and the EF corpus folder"""
         name = ef_xml_root_tag.tag.replace(".entityAnnotation", "")
         document_tags = ef_xml_root_tag.findall("document")
         return Corpus(name, [Document.entity_fishing_from_tag(t, corpus_folder) for t in document_tags])
@@ -48,7 +46,7 @@ class Document:
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
 
-    def inception_to_xml_string(self, force_single_sentence=False, named_entities_xmi_ids_start = 9000, tagset_tag_str=DEFAULT_NAMED_ENTITY_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
+    def inception_to_xml_string(self, force_single_sentence=False, named_entities_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
         
         Note: replaces " characters in text wth ', to simplify handling of XML.
@@ -67,13 +65,14 @@ class Document:
             <cas:View sofa="1" members="{("8998 " if force_single_sentence else "")}8999 {" ".join(str(named_entities_xmi_ids_start+i) for i, ne in enumerate(self.named_entities))}"/>
         </xmi:XMI>
         '''.replace("\n    ","\n").strip()
-    def inception_to_xml_file(self, folder="./", filename=None, force_single_sentence=False, named_entities_xmi_ids_start = 9000, **named_entity_to_tag_kwargs):
+    def inception_to_xml_file(self, folder="./", filename=None, **inception_to_xml_string_kwargs):
         if not filename:
             filename=self.name
         with open(path.join(folder,filename), "w") as outfile:
-            outfile.write(self.inception_to_xml_string(force_single_sentence, named_entities_xmi_ids_start, **named_entity_to_tag_kwargs))
+            outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
     @staticmethod
     def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None):
+        """Returns a Document from a lxml etree entity-fishing document tag"""
         named_entities_tags = ef_xml_document_tag.findall("annotation")
         doc = Document(
             ef_xml_document_tag.attrib["docName"],
@@ -124,42 +123,3 @@ class NamedEntity:
         
 # %%
 
-
-# %% Testing writing inception XML input 
-
-text = """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed
-do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit
-in voluptate velit esse cillum dolore eu fugiat nulla pariatur. \"Excepteur\"
-sint occaecat cupidatat non proident, sunt in culpa qui officia 'deserunt' mollit
-anim id est laborum."""
-
-named_entities = [
-    NamedEntity(28, 39, "http://www.wikidata.org/entity/Q1"),
-    NamedEntity(127, 131, "http://www.wikidata.org/entity/Q2"),
-    NamedEntity(162, 174, "http://www.wikidata.org/entity/Q3"),
-    NamedEntity(162, 174, "http://www.wikidata.org/entity/Q4"),
-    NamedEntity(412, 420, "http://www.wikidata.org/entity/Q5")
-]
-doc = Document("test", named_entities, text)
-
-doc.inception_to_xml_file()
-
-# %%
-
-entity_fishing_corpus_folder = "../entity-fishing/data/corpus/corpus-long/dhs-training-de/"
-entity_fishing_annotation_output_file = path.join(entity_fishing_corpus_folder,"dhs-training-de.xml")
-entity_fishing_corpus_rawtext_folder = path.join(entity_fishing_corpus_folder, "RawText/")
-
-with open(entity_fishing_annotation_output_file) as entity_fishing_xml_file:
-    entity_fishing_xml_root = etree.parse(entity_fishing_xml_file).getroot()
-    corpus = Corpus.entity_fishing_from_tag_and_corpus(entity_fishing_xml_root, entity_fishing_corpus_rawtext_folder)
-# %%
-
-entity_fishing_tag_str = '<type2:TagsetDescription xmi:id="1780" sofa="1" begin="0" end="0" layer="webanno.custom.Entityfishinglayer" name="Grobid-NER" input="false"/>'
-
-inception_import_folder = "../inception-import-xml/"
-for d in corpus.documents:
-    d.inception_to_xml_file(inception_import_folder, force_single_sentence=True, tag_name="custom:Entityfishinglayer", identifier_attribute_name="wikidataidentifier")
-# %%
