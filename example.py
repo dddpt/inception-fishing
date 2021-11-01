@@ -26,8 +26,10 @@ doc = Document("test", named_entities, text)
 
 # %%
 
-entity_fishing_corpus_folder = "../entity-fishing/data/corpus/corpus-long/dhs-training-de/"
-entity_fishing_annotation_output_file = path.join(entity_fishing_corpus_folder,"dhs-training-de.xml")
+language = "fr"
+
+entity_fishing_corpus_folder = f"../entity-fishing/data/corpus/corpus-long/dhs-training-{language}/"
+entity_fishing_annotation_output_file = path.join(entity_fishing_corpus_folder,f"dhs-training-{language}.xml")
 entity_fishing_corpus_rawtext_folder = path.join(entity_fishing_corpus_folder, "RawText/")
 
 with open(entity_fishing_annotation_output_file) as entity_fishing_xml_file:
@@ -39,5 +41,6 @@ inception_tagset_tag_str = '<type2:TagsetDescription xmi:id="1780" sofa="1" begi
 
 inception_import_folder = "../inception-import-xml/"
 for d in corpus.documents:
+    print(f"doing Document  {d.name}")
     d.inception_to_xml_file(inception_import_folder, force_single_sentence=True, tagset_tag_str=inception_tagset_tag_str, tag_name="custom:Entityfishinglayer", identifier_attribute_name="wikidataidentifier")
 # %%
