@@ -1,10 +1,12 @@
 # %%
 
-from os import listdir, path
+from os import path
+import re
 
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
-
+inception_being_regex=re.compile(r'begin="(\d+)"')
+inception_end_regex=re.compile(r'end="(\d+)"')
 
 def get_attributes_string(class_name, object_dict):
     """Unimportant utility function to format __str__() and __repr()"""
@@ -81,14 +83,30 @@ class Document:
         if corpus_folder:
             doc.entity_fishing_get_text_from_corpus_folder(corpus_folder)
         return doc
+    @staticmethod
+    def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs):
+        named_entity_tag_regex = "<"+named_entity_tag_name+r"\W.+?/>"
+        tags = re.findall(named_entity_tag_regex, document_string)
+        named_entities = [NamedEntity.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
+        text_regex = r'sofaString="(.+?)"'
+        text = re.search(text_regex, document_string).group(1)
+        return Document(name, named_entities, text)
+    @staticmethod
+    def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs):
+        with open(file_path) as file:
+            document_string = file.read()
+            if document_name is None:
+                document_name = file_path
+            return Document.inception_from_string(document_name, document_string, **inception_from_string_kwargs)
 
 wikidata_entity_base_url = "http://www.wikidata.org/entity/"
 class NamedEntity:
-    def __init__(self, start, end, wikidata_entity_url=None):
-        """Creates NamedEntity, one of end or length must be given, length has priority over end if both given"""
+    def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None):
+        """Creates NamedEntity, end is non-inclusive"""
         self.start = start
         self.end = end
         self.wikidata_entity_url = wikidata_entity_url
+        self.grobid_tag = grobid_tag
     @property
     def length(self):
         return self.end-self.start
@@ -120,6 +138,27 @@ class NamedEntity:
         length = int(ef_xml_annotation_tag.find("length").text)
         wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
         return NamedEntity(offset, offset+length, wikidata_entity_base_url+wikidata_id)
+    @staticmethod
+    def inception_from_tag_string(tag_string, identifier_attribute_name="identifier", grobid_tag_attribute_name="entityfishingtag"):
+        """
+    
+        <custom:Entityfishinglayer xmi:id="3726" sofa="1" begin="224" end="244" entityfishingtag="INSTALLATION" wikidataidentifier="http://www.wikidata.org/entity/Q2971666"/>
+        """
+        offset_match = inception_being_regex.search(tag_string)
+        end_match = inception_end_regex.search(tag_string)
+        if (not offset_match) or (not end_match):
+            raise Exception(f"NamedEntity.inception_from_tag_string() missing begin or end attribute in tag: {tag_string}")
+        offset = offset_match.group(1)
+        end = end_match.group(1)
+
+        identifier_match = re.search(identifier_attribute_name+r'="(.+?)"', tag_string)
+        identifier = identifier_match.group(1) if identifier_match else None
+
+        grobid_tag_match = re.search(grobid_tag_attribute_name+r'="(.+?)"', tag_string)
+        grobid_tag = grobid_tag_match.group(1) if grobid_tag_match else None
+
+
+        return NamedEntity(offset, end, identifier, grobid_tag)
         
 # %%
 
