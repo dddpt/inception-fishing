@@ -115,6 +115,13 @@ class Document:
             filename=self.name
         with open(path.join(folder,filename), "w") as outfile:
             outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
+
+    @staticmethod
+    def inception_correct_name_encoding_errors(name):
+        encoding_errors = {"├д": "ä", "├╝": "ü"}
+        for err, corr in encoding_errors.items():
+            name = name.replace(err, corr)
+        return name
     @staticmethod
     def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None):
         """Returns a Document from a lxml etree entity-fishing document tag"""
@@ -133,7 +140,11 @@ class Document:
         annotations = [Annotation.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
         text_regex = r'sofaString="(.+?)"'
         text = re.search(text_regex, document_string).group(1)
-        return Document(name, annotations, text)
+        return Document(
+            Document.inception_correct_name_encoding_errors(name),
+            annotations,
+            text
+        )
     @staticmethod
     def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs):
         with open(file_path) as file:
