@@ -1,0 +1,39 @@
+
+
+
+GROBID_NER_TAGS = [
+    "ACRONYM",
+    "ANIMAL",
+    "ARTIFACT",
+    "AWARD",
+    "BUSINESS",
+    "CONCEPT",
+    "CONCEPTUAL",
+    "CREATION",
+    "EVENT",
+    "IDENTIFIER",
+    "INSTALLATION",
+    "INSTITUTION",
+    "LEGAL",
+    "LOCATION",
+    "MEASURE",
+    "MEDIA",
+    "NATIONAL",
+    "ORGANISATION",
+    "PERIOD",
+    "PERSON",
+    "PERSON_TYPE",
+    "PLANT",
+    "SPORT_TEAM",
+    "SUBSTANCE",
+    "WEBSITE",
+    "TITLE",
+    "UNKNOWN",   
+]
+
+DHS_NERD_EXTRA_TAGS = [
+    "OCCUPATION",
+    "FAMILY"
+]
+
+DHS_NERD_ANNOTATIONS_TAGS = GROBID_NER_TAGS + DHS_NERD_EXTRA_TAGS
