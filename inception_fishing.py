@@ -3,6 +3,7 @@
 from os import path, listdir
 import re
 from typing import Sequence
+from __future__ import annotations
 
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
@@ -24,10 +25,10 @@ wikidata_entity_base_url = "http://www.wikidata.org/entity/"
 class Annotation:
     def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None):
         """Creates Annotation, end is non-inclusive"""
-        self.start = start
-        self.end = end
-        self.wikidata_entity_url = wikidata_entity_url
-        self.grobid_tag = grobid_tag
+        self.start:int = start
+        self.end:int = end
+        self.wikidata_entity_url:str = wikidata_entity_url
+        self.grobid_tag:str = grobid_tag
     @property
     def length(self):
         return self.end-self.start
@@ -43,7 +44,7 @@ class Annotation:
     def __repr__(self):
         return get_attributes_string("Annotation",self.__dict__)
     @staticmethod
-    def entity_fishing_from_tag(ef_xml_annotation_tag):
+    def entity_fishing_from_tag(ef_xml_annotation_tag) -> Annotation:
         """
         
         <annotation>
@@ -60,7 +61,7 @@ class Annotation:
         wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
         return Annotation(offset, offset+length, wikidata_entity_base_url+wikidata_id)
     @staticmethod
-    def inception_from_tag_string(tag_string, identifier_attribute_name="identifier", grobid_tag_attribute_name="entityfishingtag"):
+    def inception_from_tag_string(tag_string, identifier_attribute_name="identifier", grobid_tag_attribute_name="entityfishingtag") -> Annotation:
         """
     
         <custom:Entityfishinglayer xmi:id="3726" sofa="1" begin="224" end="244" entityfishingtag="INSTALLATION" wikidataidentifier="http://www.wikidata.org/entity/Q2971666"/>
@@ -86,9 +87,9 @@ class Annotation:
 
 class Document:
     def __init__(self, name:str, annotations, text = ""):
-        self.name = name
-        self.annotations = annotations
-        self.text = text
+        self.name:str = name
+        self.annotations:Sequence[Annotation] = annotations
+        self.text:str = text
     
     def replace_span(self, start, end, replacement):
         """Replaces given span
@@ -159,7 +160,7 @@ class Document:
             name = name.replace(err, corr)
         return name
     @staticmethod
-    def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None):
+    def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None) -> Document:
         """Returns a Document from a lxml etree entity-fishing document tag"""
         annotations_tags = ef_xml_document_tag.findall("annotation")
         doc = Document(
@@ -170,7 +171,7 @@ class Document:
             doc.entity_fishing_get_text_from_corpus_folder(corpus_folder)
         return doc
     @staticmethod
-    def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs):
+    def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs) -> Document:
         named_entity_tag_regex = "<"+named_entity_tag_name+r"\W.+?/>"
         tags = re.findall(named_entity_tag_regex, document_string)
         annotations = [Annotation.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
@@ -182,7 +183,7 @@ class Document:
             text
         )
     @staticmethod
-    def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs):
+    def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs) -> Document:
         with open(file_path) as file:
             document_string = file.read()
             if document_name is None:
@@ -194,10 +195,10 @@ class Document:
 
 class Corpus:
     def __init__(self, name, documents):
-        self.name = name
-        self.documents = documents
+        self.name:str = name
+        self.documents:Sequence[Document] = documents
     @staticmethod
-    def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None):
+    def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None) -> Corpus:
         """Returns a Corpus object from a lxml.etree tag (the root of an EF evaluation XML output) and the EF corpus folder"""
         name = ef_xml_root_tag.tag.replace(".entityAnnotation", "")
         document_tags = ef_xml_root_tag.findall("document")
@@ -209,7 +210,7 @@ class Corpus:
             "documents": [d.name for d in self.documents]}
         )
     @staticmethod
-    def inception_from_directory(name, dir_path, inception_user_name, **document_inception_from_file_kwargs):
+    def inception_from_directory(name, dir_path, inception_user_name, **document_inception_from_file_kwargs) -> Corpus:
         documents_directories = listdir(dir_path)
         documents = [
             Document.inception_from_file(
