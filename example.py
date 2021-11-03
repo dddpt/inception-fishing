@@ -14,11 +14,11 @@ sint occaecat cupidatat non proident, sunt in culpa qui officia 'deserunt' molli
 anim id est laborum."""
 
 named_entities = [
-    NamedEntity(28, 39, "http://www.wikidata.org/entity/Q1"),
-    NamedEntity(127, 131, "http://www.wikidata.org/entity/Q2"),
-    NamedEntity(162, 174, "http://www.wikidata.org/entity/Q3"),
-    NamedEntity(162, 174, "http://www.wikidata.org/entity/Q4"),
-    NamedEntity(412, 420, "http://www.wikidata.org/entity/Q5")
+    Annotation(28, 39, "http://www.wikidata.org/entity/Q1"),
+    Annotation(127, 131, "http://www.wikidata.org/entity/Q2"),
+    Annotation(162, 174, "http://www.wikidata.org/entity/Q3"),
+    Annotation(162, 174, "http://www.wikidata.org/entity/Q4"),
+    Annotation(412, 420, "http://www.wikidata.org/entity/Q5")
 ]
 doc = Document("test", named_entities, text)
 

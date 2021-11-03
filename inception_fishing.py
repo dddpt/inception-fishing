@@ -2,6 +2,7 @@
 
 from os import path, listdir
 import re
+from typing import Sequence
 
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
@@ -16,6 +17,7 @@ def get_attributes_string(class_name, object_dict):
     ])})"""
 
 # %%
+
 
 class Corpus:
     def __init__(self, name, documents):
@@ -38,11 +40,40 @@ class Corpus:
         )
 
 class Document:
-    def __init__(self, name, named_entities, text = ""):
+    def __init__(self, name:str, annotations, text = ""):
         self.name = name
-        self.named_entities = named_entities
+        self.annotations = annotations
         self.text = text
+    
+    def replace_span(self, start, end, replacement):
+        """Replaces given span
         
+        Throws an exception if both 
+        """
+        replaced_length = end-start
+        replacement_length=len(replacement)
+        annotation_indexation_shift = replacement_length - replaced_length
+        new_text = self.text[:start] + replacement + self.text[end:]
+        for a in self.annotations:
+            start_between = (a.start >= start) and (a.start <end) 
+            end_between = (a.end >= start) and (a.end <end)
+            print(f"start_between: {start_between}, end_between: {end_between}")
+            if start_between != end_between:
+                raise Exception(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} intersects with {a}. Text:\n{self.text}")
+            if a.start >= end:
+                a.start += annotation_indexation_shift
+            if a.end >= end:
+                a.end += annotation_indexation_shift
+        self.text=new_text
+        return annotation_indexation_shift
+
+    def replace_regex(self, to_replace_regex, replacement):
+        total_shift = 0
+        for match in re.finditer(to_replace_regex, self.text):
+            start, end = match.span()
+            total_shift += self.replace_span(start, end, replacement)
+        return total_shift
+
     def entity_fishing_get_text_from_corpus_folder(self, corpus_folder):
         text_file_path = path.join(corpus_folder, self.name) if corpus_folder else self.name
         with open(text_file_path) as f:
@@ -51,23 +82,23 @@ class Document:
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
 
-    def inception_to_xml_string(self, force_single_sentence=False, named_entities_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
+    def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
         
         Note: replaces " characters in text wth ', to simplify handling of XML.
         force_single_sentence=True forces the whole document text to be considered as a single sentence by inception,
         useful when text contains non-sentence-inducing dots (such as abbreviation dots in the DHS)
         """
-        named_entities_str ="\n            ".join(ne.inception_to_tag_string(named_entities_xmi_ids_start+i, **named_entity_to_tag_kwargs) for i, ne in enumerate(self.named_entities))
+        annotations_str ="\n            ".join(ne.inception_to_tag_string(annotations_xmi_ids_start+i, **named_entity_to_tag_kwargs) for i, ne in enumerate(self.annotations))
         force_single_sentence_str = f'\n            <type4:Sentence xmi:id="8998" sofa="1" begin="0" end="{len(self.text)}"/>' if force_single_sentence else ""
         return f'''
         <?xml version="1.1" encoding="UTF-8"?>
         <xmi:XMI xmlns:pos="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/pos.ecore" xmlns:tcas="http:///uima/tcas.ecore" xmlns:xmi="http://www.omg.org/XMI" xmlns:cas="http:///uima/cas.ecore" xmlns:tweet="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/pos/tweet.ecore" xmlns:morph="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/morph.ecore" xmlns:dependency="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/dependency.ecore" xmlns:type5="http:///de/tudarmstadt/ukp/dkpro/core/api/semantics/type.ecore" xmlns:type8="http:///de/tudarmstadt/ukp/dkpro/core/api/transform/type.ecore" xmlns:type7="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type.ecore" xmlns:type2="http:///de/tudarmstadt/ukp/dkpro/core/api/metadata/type.ecore" xmlns:type9="http:///org/dkpro/core/api/xml/type.ecore" xmlns:type3="http:///de/tudarmstadt/ukp/dkpro/core/api/ner/type.ecore" xmlns:type4="http:///de/tudarmstadt/ukp/dkpro/core/api/segmentation/type.ecore" xmlns:type="http:///de/tudarmstadt/ukp/dkpro/core/api/coref/type.ecore" xmlns:type6="http:///de/tudarmstadt/ukp/dkpro/core/api/structure/type.ecore" xmlns:constituent="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/constituent.ecore" xmlns:chunk="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/chunk.ecore" xmlns:custom="http:///webanno/custom.ecore" xmi:version="2.0">
             <cas:NULL xmi:id="0"/>
-            {named_entities_str}{force_single_sentence_str}
+            {annotations_str}{force_single_sentence_str}
             {tagset_tag_str}
             <cas:Sofa xmi:id="1" sofaNum="1" sofaID="_InitialView" mimeType="text" sofaString="{self.text.replace('"', "'")}"/>
-            <cas:View sofa="1" members="{("8998 " if force_single_sentence else "")}8999 {" ".join(str(named_entities_xmi_ids_start+i) for i, ne in enumerate(self.named_entities))}"/>
+            <cas:View sofa="1" members="{("8998 " if force_single_sentence else "")}8999 {" ".join(str(annotations_xmi_ids_start+i) for i, ne in enumerate(self.annotations))}"/>
         </xmi:XMI>
         '''.replace("\n    ","\n").strip()
     def inception_to_xml_file(self, folder="./", filename=None, **inception_to_xml_string_kwargs):
@@ -78,10 +109,10 @@ class Document:
     @staticmethod
     def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None):
         """Returns a Document from a lxml etree entity-fishing document tag"""
-        named_entities_tags = ef_xml_document_tag.findall("annotation")
+        annotations_tags = ef_xml_document_tag.findall("annotation")
         doc = Document(
             ef_xml_document_tag.attrib["docName"],
-            [NamedEntity.entity_fishing_from_tag(t) for t in named_entities_tags]
+            [Annotation.entity_fishing_from_tag(t) for t in annotations_tags]
         )
         if corpus_folder:
             doc.entity_fishing_get_text_from_corpus_folder(corpus_folder)
@@ -90,10 +121,10 @@ class Document:
     def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs):
         named_entity_tag_regex = "<"+named_entity_tag_name+r"\W.+?/>"
         tags = re.findall(named_entity_tag_regex, document_string)
-        named_entities = [NamedEntity.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
+        annotations = [Annotation.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
         text_regex = r'sofaString="(.+?)"'
         text = re.search(text_regex, document_string).group(1)
-        return Document(name, named_entities, text)
+        return Document(name, annotations, text)
     @staticmethod
     def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs):
         with open(file_path) as file:
@@ -103,9 +134,11 @@ class Document:
             return Document.inception_from_string(document_name, document_string, **inception_from_string_kwargs)
 
 wikidata_entity_base_url = "http://www.wikidata.org/entity/"
-class NamedEntity:
+
+
+class Annotation:
     def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None):
-        """Creates NamedEntity, end is non-inclusive"""
+        """Creates Annotation, end is non-inclusive"""
         self.start = start
         self.end = end
         self.wikidata_entity_url = wikidata_entity_url
@@ -123,7 +156,7 @@ class NamedEntity:
         """
         return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute_name}="{self.wikidata_entity_url}"/>'
     def __repr__(self):
-        return get_attributes_string("NamedEntity",self.__dict__)
+        return get_attributes_string("Annotation",self.__dict__)
     @staticmethod
     def entity_fishing_from_tag(ef_xml_annotation_tag):
         """
@@ -140,7 +173,7 @@ class NamedEntity:
         offset = int(ef_xml_annotation_tag.find("offset").text)
         length = int(ef_xml_annotation_tag.find("length").text)
         wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
-        return NamedEntity(offset, offset+length, wikidata_entity_base_url+wikidata_id)
+        return Annotation(offset, offset+length, wikidata_entity_base_url+wikidata_id)
     @staticmethod
     def inception_from_tag_string(tag_string, identifier_attribute_name="identifier", grobid_tag_attribute_name="entityfishingtag"):
         """
@@ -150,7 +183,7 @@ class NamedEntity:
         offset_match = inception_being_regex.search(tag_string)
         end_match = inception_end_regex.search(tag_string)
         if (not offset_match) or (not end_match):
-            raise Exception(f"NamedEntity.inception_from_tag_string() missing begin or end attribute in tag: {tag_string}")
+            raise Exception(f"Annotation.inception_from_tag_string() missing begin or end attribute in tag: {tag_string}")
         offset = offset_match.group(1)
         end = end_match.group(1)
 
@@ -161,7 +194,5 @@ class NamedEntity:
         grobid_tag = grobid_tag_match.group(1) if grobid_tag_match else None
 
 
-        return NamedEntity(offset, end, identifier, grobid_tag)
+        return Annotation(offset, end, identifier, grobid_tag)
         
-# %%
-
