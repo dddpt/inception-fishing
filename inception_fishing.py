@@ -29,15 +29,24 @@ class Corpus:
         name = ef_xml_root_tag.tag.replace(".entityAnnotation", "")
         document_tags = ef_xml_root_tag.findall("document")
         return Corpus(name, [Document.entity_fishing_from_tag(t, corpus_folder) for t in document_tags])
-    def inception_from_directory(name, directory_path, inception_user_name):
-        documents_directories = listdir(directory_path)
-        return Corpus(name, [Document.inception_from_file(path.join(directory_path,dd,inception_user_name+".xmi"), dd) for dd in documents_directories])
     def __repr__(self):
         return get_attributes_string(
             "Corpus",
             {"name": self.name,
             "documents": [d.name for d in self.documents]}
         )
+    @staticmethod
+    def inception_from_directory(name, dir_path, inception_user_name, **document_inception_from_file_kwargs):
+        documents_directories = listdir(dir_path)
+        documents = [
+            Document.inception_from_file(
+                path.join(dir_path,dd,inception_user_name+".xmi"),
+                dd,
+                **document_inception_from_file_kwargs
+            ) for dd in documents_directories
+        ]
+        return Corpus(name, documents)
+
 
 class Document:
     def __init__(self, name:str, annotations, text = ""):
