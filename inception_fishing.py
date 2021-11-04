@@ -1,9 +1,9 @@
 # %%
 
+from __future__ import annotations
 from os import path, listdir
 import re
 from typing import Sequence
-from __future__ import annotations
 
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
@@ -35,6 +35,12 @@ class Annotation:
     @length.setter
     def set_length(self, new_length):
         self.end = self.start+new_length
+    def __hash__(self):
+        return hash((self.start, self.end, self.wikidata_entity_url, self.grobid_tag))
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_url==self.wikidata_entity_url) and (other.end==self.grobid_tag)
+        return False
     def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity", identifier_attribute_name="identifier"):
         """Returns a valid <type3:NamedEntity/> tag string for inception's UIMA CAS XMI (XML 1.1) format
 
@@ -70,8 +76,8 @@ class Annotation:
         end_match = inception_end_regex.search(tag_string)
         if (not offset_match) or (not end_match):
             raise Exception(f"Annotation.inception_from_tag_string() missing begin or end attribute in tag: {tag_string}")
-        offset = offset_match.group(1)
-        end = end_match.group(1)
+        offset = int(offset_match.group(1))
+        end = int(end_match.group(1))
 
         identifier_match = re.search(identifier_attribute_name+r'="(.+?)"', tag_string)
         identifier = identifier_match.group(1) if identifier_match else None
@@ -118,8 +124,26 @@ class Document:
         for match in re.finditer(to_replace_regex, self.text):
             start, end = match.span()
             total_shift += self.replace_span(start, end, replacement)
-        return total_shift
-
+        return total_shift    
+    def get_annotations_nesting_level(self):
+        if len(self.annotations) <= 1:
+            return [0] * len(self.annotations)
+        self.annotations.sort(key=lambda a: a.start)
+        nesting_levels = {
+            a: 0
+            for a in self.annotations
+        }
+        for i,a in enumerate(self.annotations[:-1]):
+            for a2 in self.annotations[i+1:]:
+                if a2.start<a.end:
+                    print(f"NESTING: {a2}\ninsid\n{a}\n")
+                    nesting_levels[a2] = nesting_levels[a2]+1
+                else:
+                    break
+        return nesting_levels
+    def remove_nested_annotations(self):
+        nesting_levels = list(self.get_annotations_nesting_level().items())
+        self.annotations = [a for a in self.annotations if nesting_levels[a]==0]
     def entity_fishing_get_text_from_corpus_folder(self, corpus_folder):
         text_file_path = path.join(corpus_folder, self.name) if corpus_folder else self.name
         with open(text_file_path) as f:
@@ -152,7 +176,6 @@ class Document:
             filename=self.name
         with open(path.join(folder,filename), "w") as outfile:
             outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
-
     @staticmethod
     def inception_correct_name_encoding_errors(name):
         encoding_errors = {"├д": "ä", "├╝": "ü"}
