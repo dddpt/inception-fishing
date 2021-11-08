@@ -5,6 +5,8 @@ from os import path, listdir
 import re
 from typing import Sequence
 
+import xml.etree.ElementTree as ET
+
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
 inception_being_regex=re.compile(r'begin="(\d+)"')
@@ -23,18 +25,21 @@ wikidata_entity_base_url = "http://www.wikidata.org/entity/"
 
 
 class Annotation:
-    def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None):
+    def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None, mention=None):
         """Creates Annotation, end is non-inclusive"""
         self.start:int = start
         self.end:int = end
         self.wikidata_entity_url:str = wikidata_entity_url
         self.grobid_tag:str = grobid_tag
+        self.mention:str = mention
     @property
     def length(self):
         return self.end-self.start
     @length.setter
     def set_length(self, new_length):
         self.end = self.start+new_length
+    def set_mention(self, document:Document):
+        self.mention = document.text[self.start:self.end]
     def __hash__(self):
         return hash((self.start, self.end, self.wikidata_entity_url, self.grobid_tag))
     def __eq__(self, other):
@@ -49,9 +54,27 @@ class Annotation:
         return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute_name}="{self.wikidata_entity_url}"/>'
     def __repr__(self):
         return get_attributes_string("Annotation",self.__dict__)
+    def entity_fishing_to_xml_tag(self, include_grobid_tag=False):
+        annotation_tag = ET.Element("annotation")
+        offset_tag = ET.SubElement(annotation_tag, "offset")
+        offset_tag.text = str(self.start)
+        length_tag = ET.SubElement(annotation_tag, "length")
+        length_tag.text = str(self.length)
+        if self.mention is not None:
+            mention_tag = ET.SubElement(annotation_tag, "mention")
+            mention_tag.text = self.mention
+        if self.wikidata_entity_url is not None:
+            wikidataid_tag = ET.SubElement(annotation_tag, "wikidataId")
+            wikidataid_tag.text = self.wikidata_entity_url
+        if include_grobid_tag and self.grobid_tag is not None:
+            grobid_tag_tag = ET.SubElement(annotation_tag, "grobidTag")
+            grobid_tag_tag.text = self.grobid_tag
+        return annotation_tag
+        
+            
     @staticmethod
     def entity_fishing_from_tag(ef_xml_annotation_tag) -> Annotation:
-        """
+        """Parses an annotation from an lxml.etree.parse(...) tag
         
         <annotation>
 			<mention>14.1</mention>
@@ -125,14 +148,17 @@ class Document:
             start, end = match.span()
             total_shift += self.replace_span(start, end, replacement)
         return total_shift    
+    def update_mentions(self):
+        for a in self.annotations:
+            a.set_mention(self)
     def get_annotations_nesting_level(self):
-        if len(self.annotations) <= 1:
-            return [0] * len(self.annotations)
-        self.annotations.sort(key=lambda a: a.start)
         nesting_levels = {
             a: 0
             for a in self.annotations
         }
+        if len(self.annotations) <= 1:
+            return nesting_levels
+        self.annotations.sort(key=lambda a: a.start)
         for i,a in enumerate(self.annotations[:-1]):
             for a2 in self.annotations[i+1:]:
                 if a2.start<a.end:
@@ -142,7 +168,7 @@ class Document:
                     break
         return nesting_levels
     def remove_nested_annotations(self):
-        nesting_levels = list(self.get_annotations_nesting_level().items())
+        nesting_levels = self.get_annotations_nesting_level()
         self.annotations = [a for a in self.annotations if nesting_levels[a]==0]
     def entity_fishing_get_text_from_corpus_folder(self, corpus_folder):
         text_file_path = path.join(corpus_folder, self.name) if corpus_folder else self.name
@@ -151,6 +177,15 @@ class Document:
                 return self.text
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
+
+    def entity_fishing_to_xml_tag(self, **annotation_kwargs):
+        document_tag = ET.Element("document")
+        document_tag.set("docName", self.name)
+        for a in self.annotations:
+            document_tag.append(a.entity_fishing_to_xml_tag(**annotation_kwargs))
+        return document_tag
+        
+            
 
     def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
@@ -220,6 +255,22 @@ class Corpus:
     def __init__(self, name, documents):
         self.name:str = name
         self.documents:Sequence[Document] = documents
+
+    def entity_fishing_to_xml_tag(self, **document_kwargs):
+        corpus_tag = ET.Element(self.name+".entityAnnotation")
+        for d in self.documents:
+            corpus_tag.append(d.entity_fishing_to_xml_tag(**document_kwargs))
+        return corpus_tag
+
+    def entity_fishing_to_xml_file(self, filepath, **document_kwargs):
+        intro_str = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
+        corpus_tag = self.entity_fishing_to_xml_tag(**document_kwargs)
+
+        ET.ElementTree(corpus_tag).write(filepath, encoding="utf-8")
+        with open(filepath, "r", encoding="utf-8") as file:
+            content = file.read()
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(intro_str+"\n"+content)
     @staticmethod
     def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None) -> Corpus:
         """Returns a Corpus object from a lxml.etree tag (the root of an EF evaluation XML output) and the EF corpus folder"""
