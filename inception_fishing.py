@@ -7,6 +7,8 @@ from typing import Sequence
 
 import xml.etree.ElementTree as ET
 
+from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
+
 # %%
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
 inception_being_regex=re.compile(r'begin="(\d+)"')
@@ -25,26 +27,54 @@ wikidata_entity_base_url = "http://www.wikidata.org/entity/"
 
 
 class Annotation:
-    def __init__(self, start, end, wikidata_entity_url=None, grobid_tag=None, mention=None):
+    def __init__(
+            self,
+            start,
+            end,
+            wikidata_entity_id=None,
+            wikipedia_page_id=None,
+            wikipedia_page_title=None,
+            wikidata_entity_url=None,
+            mention=None,
+            grobid_tag=None
+        ):
         """Creates Annotation, end is non-inclusive"""
         self.start:int = start
         self.end:int = end
-        self.wikidata_entity_url:str = wikidata_entity_url
+        self.wikidata_entity_id:str = wikidata_entity_id
+        if (self.wikidata_entity_id is None) and (wikidata_entity_url is not None):
+            self.wikidata_entity_url = wikidata_entity_url
+        self.wikipedia_page_id:str = wikipedia_page_id
+        self.wikipedia_page_title:str = wikipedia_page_title
         self.grobid_tag:str = grobid_tag
         self.mention:str = mention
     @property
     def length(self):
         return self.end-self.start
     @length.setter
-    def set_length(self, new_length):
+    def length(self, new_length):
         self.end = self.start+new_length
+    @property
+    def wikidata_entity_url(self) -> str:
+        if self.wikidata_entity_id is None:
+            return None
+        return wikidata_entity_base_url + self.wikidata_entity_id
+    @wikidata_entity_url.setter
+    def wikidata_entity_url(self, new_url):
+        self.wikidata_entity_id = Annotation.get_wikidata_id_from_url(new_url)
     def set_mention(self, document:Document):
         self.mention = document.text[self.start:self.end]
+    def set_wikipedia_title_and_id(self, wikipedia_titles_and_ids=dict(), language=None):
+        if len(wikipedia_titles_and_ids)==0 and language is not None:
+            wikipedia_titles_and_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids([self.wikidata_entity_id], [language])
+        if self.wikidata_entity_id in wikipedia_titles_and_ids:
+            self.wikipedia_page_title = wikipedia_titles_and_ids[self.wikidata_entity_id][0]
+            self.wikipedia_page_id = wikipedia_titles_and_ids[self.wikidata_entity_id][1]
     def __hash__(self):
-        return hash((self.start, self.end, self.wikidata_entity_url, self.grobid_tag))
+        return hash((self.start, self.end, self.wikidata_entity_id, self.grobid_tag))
     def __eq__(self, other):
         if type(other) is type(self):
-            return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_url==self.wikidata_entity_url) and (other.end==self.grobid_tag)
+            return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_id==self.wikidata_entity_id) and (other.end==self.grobid_tag)
         return False
     def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity", identifier_attribute_name="identifier"):
         """Returns a valid <type3:NamedEntity/> tag string for inception's UIMA CAS XMI (XML 1.1) format
@@ -63,15 +93,17 @@ class Annotation:
         if self.mention is not None:
             mention_tag = ET.SubElement(annotation_tag, "mention")
             mention_tag.text = self.mention
-        if self.wikidata_entity_url is not None:
-            wikidataid_tag = ET.SubElement(annotation_tag, "wikidataId")
-            wikidataid_tag.text = self.wikidata_entity_url
         if include_grobid_tag and self.grobid_tag is not None:
             grobid_tag_tag = ET.SubElement(annotation_tag, "grobidTag")
             grobid_tag_tag.text = self.grobid_tag
         return annotation_tag
-        
-            
+    
+    @staticmethod
+    def get_wikidata_id_from_url(wikidata_url):
+        if (wikidata_url is not None) and wikidata_url!="null":
+            return wikidata_url.replace(wikidata_entity_base_url, "") 
+        return None
+
     @staticmethod
     def entity_fishing_from_tag(ef_xml_annotation_tag) -> Annotation:
         """Parses an annotation from an lxml.etree.parse(...) tag
@@ -88,9 +120,18 @@ class Annotation:
         offset = int(ef_xml_annotation_tag.find("offset").text)
         length = int(ef_xml_annotation_tag.find("length").text)
         wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
-        return Annotation(offset, offset+length, wikidata_entity_base_url+wikidata_id)
+        wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
+        wikipedia_page_id = ef_xml_annotation_tag.find("wikipediaId").text
+        wikipedia_page_title = ef_xml_annotation_tag.find("wikiName").text
+        mention = ef_xml_annotation_tag.find("mention").text
+        return Annotation(offset, offset+length, wikidata_id, wikipedia_page_id, wikipedia_page_title, mention)
     @staticmethod
-    def inception_from_tag_string(tag_string, identifier_attribute_name="identifier", grobid_tag_attribute_name="entityfishingtag") -> Annotation:
+    def inception_from_tag_string(
+            tag_string,
+            identifier_attribute_name="identifier",
+            grobid_tag_attribute_name="entityfishingtag",
+            wikipedia_titles_and_ids=dict()
+        ) -> Annotation:
         """
     
         <custom:Entityfishinglayer xmi:id="3726" sofa="1" begin="224" end="244" entityfishingtag="INSTALLATION" wikidataidentifier="http://www.wikidata.org/entity/Q2971666"/>
@@ -102,14 +143,25 @@ class Annotation:
         offset = int(offset_match.group(1))
         end = int(end_match.group(1))
 
-        identifier_match = re.search(identifier_attribute_name+r'="(.+?)"', tag_string)
-        identifier = identifier_match.group(1) if identifier_match else None
-
         grobid_tag_match = re.search(grobid_tag_attribute_name+r'="(.+?)"', tag_string)
         grobid_tag = grobid_tag_match.group(1) if grobid_tag_match else None
 
-
-        return Annotation(offset, end, identifier, grobid_tag)
+        identifier_match = re.search(identifier_attribute_name+r'="(.+?)"', tag_string)
+        identifier_url = identifier_match.group(1) if identifier_match else None
+        wikidata_id = None
+        wikipedia_id = None
+        wikipedia_title = None
+        if identifier_url is not None:
+            wikidata_id = Annotation.get_wikidata_id_from_url(identifier_url)
+            if wikidata_id in wikipedia_titles_and_ids:
+                wikipedia_title = wikipedia_titles_and_ids[wikidata_id][0]
+                wikipedia_id = wikipedia_titles_and_ids[wikidata_id][1]
+            
+        return Annotation(offset, end, wikidata_id,
+            wikipedia_page_id = wikipedia_id,
+            wikipedia_page_title = wikipedia_title,
+            grobid_tag=grobid_tag
+        )
         
 # %%
 
@@ -162,7 +214,7 @@ class Document:
         for i,a in enumerate(self.annotations[:-1]):
             for a2 in self.annotations[i+1:]:
                 if a2.start<a.end:
-                    print(f"NESTING: {a2}\ninsid\n{a}\n")
+                    #print(f"NESTING: {a2}\ninsid\n{a}\n")
                     nesting_levels[a2] = nesting_levels[a2]+1
                 else:
                     break
@@ -177,7 +229,6 @@ class Document:
                 return self.text
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
-
     def entity_fishing_to_xml_tag(self, **annotation_kwargs):
         document_tag = ET.Element("document")
         document_tag.set("docName", self.name)
@@ -255,6 +306,22 @@ class Corpus:
     def __init__(self, name, documents):
         self.name:str = name
         self.documents:Sequence[Document] = documents
+            
+    def get_annotations_wikipedia_page_titles_and_ids(self, language):
+        """Only works for corpus with <=50 unique entities in annotations"""
+        wikidata_ids = {
+            a.wikidata_entity_id
+            for d in self.documents
+            for a in d.annotations
+            if a.wikidata_entity_id is not None
+        }
+        wikipedia_page_titles_and_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, [language])
+        return wikipedia_page_titles_and_ids[language]
+    def set_annotations_wikipedia_page_titles_and_ids(self, language):
+        wikipedia_page_titles_and_ids = self.get_annotations_wikipedia_page_titles_and_ids(language)
+        for d in self.documents:
+            for a in d.annotations:
+                a.set_wikipedia_title_and_id(wikipedia_page_titles_and_ids)
 
     def entity_fishing_to_xml_tag(self, **document_kwargs):
         corpus_tag = ET.Element(self.name+".entityAnnotation")
@@ -271,6 +338,7 @@ class Corpus:
             content = file.read()
         with open(filepath, "w", encoding="utf-8") as file:
             file.write(intro_str+"\n"+content)
+
     @staticmethod
     def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None) -> Corpus:
         """Returns a Corpus object from a lxml.etree tag (the root of an EF evaluation XML output) and the EF corpus folder"""
@@ -284,7 +352,14 @@ class Corpus:
             "documents": [d.name for d in self.documents]}
         )
     @staticmethod
-    def inception_from_directory(name, dir_path, inception_user_name, **document_inception_from_file_kwargs) -> Corpus:
+    def inception_from_directory(
+            name,
+            dir_path,
+            inception_user_name,
+            wikipedia_page_titles_and_ids_language = None,
+            **document_inception_from_file_kwargs
+        ) -> Corpus:
+
         documents_directories = listdir(dir_path)
         documents = [
             Document.inception_from_file(
@@ -292,7 +367,13 @@ class Corpus:
                 dd,
                 **document_inception_from_file_kwargs
             ) for dd in documents_directories
+            if path.isdir(path.join(dir_path,dd))
         ]
-        return Corpus(name, documents)
+
+        corpus = Corpus(name, documents)
+        if wikipedia_page_titles_and_ids_language is not None:
+            corpus.set_annotations_wikipedia_page_titles_and_ids(wikipedia_page_titles_and_ids_language)
+
+        return corpus
 
 # %%
