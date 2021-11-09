@@ -3,6 +3,7 @@
 from typing import Sequence
 from warnings import warn
 
+import pandas as pd
 import requests as r
 
 """
@@ -14,12 +15,27 @@ https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&ids=Q78|Q304
 https://en.wikipedia.org/w/api.php?action=query&titles=Fribourg&format=json
 """
 
+"""
+
+Change proposition
+- using pandas:
+    1 dtf for lng, wikidata_id, wikipedia_title
+    1 dtf for lng, wikidata_id, wikipedia_title, wikipedia_id
+- writing to csv at end of each exec
+"""
+
+# %%
+
+def dataframe_from_ids_and_lngs(wikidata_ids:Sequence[str], languages:Sequence[str]):
+    return pd.DataFrame({"wikidata_id": wikidata_ids}).merge(pd.DataFrame({"language": languages}), how="cross")
+
 # %%
 
 wikipedia_page_titles_by_lng_and_wikidata_ids = dict()
 
 # %%
 
+# wdid_lang_dtf:pd.DataFrame
 def _get_wikipedia_page_titles_from_wikidata_ids_max50(wikidata_ids:Sequence[str], languages:Sequence[str]=None):
     """Returns wikipedia page titles from wikidata ids, max 50 items at a time
 
@@ -28,26 +44,14 @@ def _get_wikipedia_page_titles_from_wikidata_ids_max50(wikidata_ids:Sequence[str
     note: this function returns an accumulator that accumulates endlessly over a program run.
     always iterate over your own wikidata_ids, not this function result. consider further optimization if long runs.
     """
-    wikidata_ids = list(i for i in wikidata_ids if i !="null")
     if len(wikidata_ids)>50:
         raise(Exception(f"wiki._get_wikipedia_page_titles_from_wikidata_ids_max50() more than 50 wikidata_ids given:\n{wikidata_ids}"))
-
-    for lng in languages:
-        if lng not in wikipedia_page_titles_by_lng_and_wikidata_ids:
-            wikipedia_page_titles_by_lng_and_wikidata_ids[lng]=dict()
-
-    already_covered_ids = set(
-        wd_id for wd_id in wikidata_ids
-        if all(wd_id in wikipedia_page_titles_by_lng_and_wikidata_ids[lng] for lng in languages)
-    )
-    ids_to_query = [wd_id for wd_id in wikidata_ids if wd_id not in already_covered_ids]
-
-    if len(ids_to_query)>0:
+    if len(wikidata_ids)>0:
         url = "https://www.wikidata.org/w/api.php"
         params = {
             "format":  "json",
             "action":  "wbgetentities",
-            "ids":  "|".join(ids_to_query),
+            "ids":  "|".join(wikidata_ids),
             "props":  "sitelinks"
         }
 
@@ -57,7 +61,7 @@ def _get_wikipedia_page_titles_from_wikidata_ids_max50(wikidata_ids:Sequence[str
         #print(f"\n-----\nwiki._get_wikipedia_page_titles_from_wikidata_ids_max50(ids, {languages})\n ids_to_query:\n{ids_to_query}\ndata:\n{data}\n-----\n")
         entities = data["entities"]
         for lng in languages:
-            for wd_id in ids_to_query:
+            for wd_id in wikidata_ids:
                 if (lng+"wiki") in entities[wd_id]["sitelinks"]:
                     wikipedia_page_titles_by_lng_and_wikidata_ids[lng][wd_id] = entities[wd_id]["sitelinks"][lng+"wiki"]["title"] 
                 else:
@@ -82,7 +86,19 @@ def get_wikipedia_page_titles_from_wikidata_ids(wikidata_ids:Sequence[str], lang
     note: this function returns an accumulator that accumulates endlessly over a program run.
     always iterate over your own wikidata_ids, not this function result. consider further optimization if long runs.
     """
-    rest = list(wikidata_ids)
+    wikidata_ids = list(i for i in wikidata_ids if i !="null")
+
+    for lng in languages:
+        if lng not in wikipedia_page_titles_by_lng_and_wikidata_ids:
+            wikipedia_page_titles_by_lng_and_wikidata_ids[lng]=dict()
+
+    already_covered_ids = set(
+        wd_id for wd_id in wikidata_ids
+        if all(wd_id in wikipedia_page_titles_by_lng_and_wikidata_ids[lng] for lng in languages)
+    )
+    ids_to_query = [wd_id for wd_id in wikidata_ids if wd_id not in already_covered_ids]
+
+    rest = list(ids_to_query)
     while len(rest)>0:
         current = rest[:50]
         rest = rest[50:]
@@ -101,24 +117,13 @@ def _get_wikipedia_pages_ids_from_titles_max50(wikipedia_titles:Sequence[str], l
     
     language should be the two-letter abbreviation for desired language"""
     # get_wikipedia_pages_ids_from_titles(wikipedia_titles:str, language:str):
-    wikipedia_titles = [t for t in wikipedia_titles if t is not None]
     if len(wikipedia_titles)>50:
         raise(Exception(f"wiki._get_wikipedia_pages_ids_from_titles_max50() more than 50 wikipedia_titles given:\n{wikipedia_titles}"))
-
-    if language not in wikipedia_page_ids_by_lng_and_title:
-        wikipedia_page_ids_by_lng_and_title[language]=dict()
-
-    already_covered_titles = set(
-        t for t in wikipedia_titles
-        if t in wikipedia_page_ids_by_lng_and_title[language]
-    )
-    titles_to_query = [t for t in wikipedia_titles if t not in already_covered_titles]
-
-    if len(titles_to_query)>0:
+    if len(wikipedia_titles)>0:
         url = f"https://{language}.wikipedia.org/w/api.php"
         params = {
             "action":  "query",
-            "titles":  "|".join(titles_to_query),
+            "titles":  "|".join(wikipedia_titles),
             "format":  "json"
         }
         resp = r.get(url=url, params=params)
@@ -141,7 +146,18 @@ def get_wikipedia_pages_ids_from_titles(wikipedia_titles:Sequence[str], language
     """Returns wikipedia page ids from their title, max 50 items at a time
     
     language should be the two-letter abbreviation for desired language"""
-    rest = list(wikipedia_titles)
+    wikipedia_titles = [t for t in wikipedia_titles if t is not None]
+
+    if language not in wikipedia_page_ids_by_lng_and_title:
+        wikipedia_page_ids_by_lng_and_title[language]=dict()
+
+    already_covered_titles = set(
+        t for t in wikipedia_titles
+        if t in wikipedia_page_ids_by_lng_and_title[language]
+    )
+    titles_to_query = [t for t in wikipedia_titles if t not in already_covered_titles]
+
+    rest = list(titles_to_query)
     while len(rest)>0:
         current = rest[:50]
         rest = rest[50:]
