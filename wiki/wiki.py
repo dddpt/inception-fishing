@@ -26,8 +26,28 @@ Change proposition
 
 # %%
 
-def dataframe_from_ids_and_lngs(wikidata_ids:Sequence[str], languages:Sequence[str]):
-    return pd.DataFrame({"wikidata_id": wikidata_ids}).merge(pd.DataFrame({"language": languages}), how="cross")
+DTF_LANG_WDID_WPTITLE_COLUMNS=["language", "wikidata_id", "wikipedia_title"]
+DTF_LANG_WDID_WPTITLE = pd.DataFrame(columns=DTF_LANG_WDID_WPTITLE_COLUMNS,
+    data=[("fr","Q12771", None),("de", "Q12771","ha")])
+
+DTF_LANG_WDID_WPTITLE_WPID_COLUMNS=["language", "wikidata_id", "wikipedia_title"]
+DTF_LANG_WDID_WPTITLE_WPID = pd.DataFrame(columns=DTF_LANG_WDID_WPTITLE_WPID_COLUMNS)
+
+# %%
+
+def dataframe_from_cartesian_product(columns:Sequence[str], col0:Sequence, col1:Sequence):
+    return pd.DataFrame({columns[0]: col0}).merge(pd.DataFrame({columns[1]: col1}), how="cross")
+
+def dataframe_only_rows_not_in_dtf2(dtf1, dtf2, columns):
+    dtf1["XXcombinedXX"] = ""
+    dtf2["XXcombinedXX"] = ""
+    for c in columns:
+        dtf1["XXcombinedXX"] = dtf1["XXcombinedXX"] +"-XYX-"+dtf1[c]
+        dtf2["XXcombinedXX"] = dtf2["XXcombinedXX"] +"-XYX-"+dtf2[c]
+    dtf1_kept = dtf1.loc[~dtf1["XXcombinedXX"].isin(dtf2["XXcombinedXX"])].copy()
+    del dtf1_kept["XXcombinedXX"]
+    del dtf2["XXcombinedXX"]
+    return dtf1_kept
 
 # %%
 
@@ -35,37 +55,38 @@ wikipedia_page_titles_by_lng_and_wikidata_ids = dict()
 
 # %%
 
-# wdid_lang_dtf:pd.DataFrame
-def _get_wikipedia_page_titles_from_wikidata_ids_max50(wikidata_ids:Sequence[str], languages:Sequence[str]=None):
-    """Returns wikipedia page titles from wikidata ids, max 50 items at a time
 
-    languages should be an array of two-letter abbreviations for desired languages
-    
-    note: this function returns an accumulator that accumulates endlessly over a program run.
-    always iterate over your own wikidata_ids, not this function result. consider further optimization if long runs.
-    """
-    if len(wikidata_ids)>50:
+def _get_wikipedia_page_titles_from_wikidata_ids_max50(dtf_lang_wdid):#wikidata_ids:Sequence[str], languages:Sequence[str]=None):
+    """Returns wikipedia page titles from wikidata ids, max 50 items at a time"""
+    #dtf_lang_wdid:pd.DataFrame = dataframe_from_ids_and_lngs(wikidata_ids, languages)
+
+    if dtf_lang_wdid.shape[0]>50:
         raise(Exception(f"wiki._get_wikipedia_page_titles_from_wikidata_ids_max50() more than 50 wikidata_ids given:\n{wikidata_ids}"))
-    if len(wikidata_ids)>0:
+    if dtf_lang_wdid.shape[0]>0:
         url = "https://www.wikidata.org/w/api.php"
         params = {
             "format":  "json",
             "action":  "wbgetentities",
-            "ids":  "|".join(wikidata_ids),
+            "ids":  "|".join(dtf_lang_wdid.wikidata_id),
             "props":  "sitelinks"
         }
-
+        print(f'"|".join(dtf_lang_wdid.wikidata_id)= {"|".join(dtf_lang_wdid.wikidata_id)}')
 
         resp = r.get(url=url, params=params)
         data = resp.json()
-        #print(f"\n-----\nwiki._get_wikipedia_page_titles_from_wikidata_ids_max50(ids, {languages})\n ids_to_query:\n{ids_to_query}\ndata:\n{data}\n-----\n")
+        
+        #print(f"\n-----\nwiki._get_wikipedia_page_titles_from_wikidata_ids_max50(ids, {languages})\n dtf_lang_wdid:\n{dtf_lang_wdid}\ndata:\n{data}\n-----\n")
         entities = data["entities"]
-        for lng in languages:
-            for wd_id in wikidata_ids:
-                if (lng+"wiki") in entities[wd_id]["sitelinks"]:
-                    wikipedia_page_titles_by_lng_and_wikidata_ids[lng][wd_id] = entities[wd_id]["sitelinks"][lng+"wiki"]["title"] 
-                else:
-                    wikipedia_page_titles_by_lng_and_wikidata_ids[lng][wd_id] = None
+        new_lng_wd_id_title = pd.DataFrame(columns=['language', 'wikidata_id', "wikipedia_title"], data=[
+            (
+                lng,
+                wd_id,
+                entities[wd_id]["sitelinks"][lng+"wiki"]["title"]
+                if (lng+"wiki") in entities[wd_id]["sitelinks"]
+                else None
+            )
+            for i,(lng, wd_id) in dtf_lang_wdid.iterrows()
+        ])
         # wikipedia_titles_by_language = {
         #     lng: {
         #         # only consider wikidata id with a wikipedia page in given language
@@ -74,7 +95,8 @@ def _get_wikipedia_page_titles_from_wikidata_ids_max50(wikidata_ids:Sequence[str
         #     }
         #     for lng in languages
         # }
-    return wikipedia_page_titles_by_lng_and_wikidata_ids
+        print(f"new_lng_wd_id_title:\n{new_lng_wd_id_title}")
+        return new_lng_wd_id_title
 
 # %%
 
@@ -86,24 +108,28 @@ def get_wikipedia_page_titles_from_wikidata_ids(wikidata_ids:Sequence[str], lang
     note: this function returns an accumulator that accumulates endlessly over a program run.
     always iterate over your own wikidata_ids, not this function result. consider further optimization if long runs.
     """
-    wikidata_ids = list(i for i in wikidata_ids if i !="null")
+    global DTF_LANG_WDID_WPTITLE
 
-    for lng in languages:
-        if lng not in wikipedia_page_titles_by_lng_and_wikidata_ids:
-            wikipedia_page_titles_by_lng_and_wikidata_ids[lng]=dict()
+    dtf_lang_wdid:pd.DataFrame = dataframe_from_cartesian_product(["language", "wikidata_id"], languages,wikidata_ids)
+    dtf_lang_wdid = dtf_lang_wdid.loc[dtf_lang_wdid.wikidata_id!="null"].copy()
 
-    already_covered_ids = set(
-        wd_id for wd_id in wikidata_ids
-        if all(wd_id in wikipedia_page_titles_by_lng_and_wikidata_ids[lng] for lng in languages)
-    )
-    ids_to_query = [wd_id for wd_id in wikidata_ids if wd_id not in already_covered_ids]
+    print(f"dtf_lang_wdid:\n{dtf_lang_wdid}")
 
-    rest = list(ids_to_query)
-    while len(rest)>0:
+    dtf_wdid_lang_to_query = dataframe_only_rows_not_in_dtf2(dtf_lang_wdid, DTF_LANG_WDID_WPTITLE, ["wikidata_id", "language"])
+
+    print(f"dtf_wdid_lang_to_query:\n{dtf_wdid_lang_to_query}")
+
+    accumulator = pd.DataFrame(columns=DTF_LANG_WDID_WPTITLE_COLUMNS)
+    rest = dtf_wdid_lang_to_query
+    while rest.shape[0]>0:
         current = rest[:50]
         rest = rest[50:]
-        _get_wikipedia_page_titles_from_wikidata_ids_max50(current, languages)
-    return wikipedia_page_titles_by_lng_and_wikidata_ids
+        new_dtf_wdid_lang_title = _get_wikipedia_page_titles_from_wikidata_ids_max50(current)
+        accumulator = accumulator.append(new_dtf_wdid_lang_title)
+    accumulator = dataframe_only_rows_not_in_dtf2(accumulator, DTF_LANG_WDID_WPTITLE, ["wikidata_id", "language"])
+    DTF_LANG_WDID_WPTITLE = DTF_LANG_WDID_WPTITLE.append(accumulator)
+    return DTF_LANG_WDID_WPTITLE
+
 
 # %%
 
@@ -112,10 +138,10 @@ wikipedia_page_ids_by_lng_and_title = dict()
 # %%
 
 
-def _get_wikipedia_pages_ids_from_titles_max50(wikipedia_titles:Sequence[str], language:str):
-    """Returns wikipedia page ids from their title, max 50 items at a time
-    
-    language should be the two-letter abbreviation for desired language"""
+def _get_wikipedia_pages_ids_from_titles_max50( wikipedia_titles:Sequence[str], language:str):
+    """Returns wikipedia page ids from their title, max 50 items at a time"""
+    #dtf_lang_wptitle = dataframe_from_cartesian_product(["wikipedia_title", "language"],wikidata_ids, [language])
+
     # get_wikipedia_pages_ids_from_titles(wikipedia_titles:str, language:str):
     if len(wikipedia_titles)>50:
         raise(Exception(f"wiki._get_wikipedia_pages_ids_from_titles_max50() more than 50 wikipedia_titles given:\n{wikipedia_titles}"))
@@ -132,37 +158,41 @@ def _get_wikipedia_pages_ids_from_titles_max50(wikipedia_titles:Sequence[str], l
         #print(f"\n-----\nwiki.get_wikipedia_pages_ids_from_titles(titles, {language})\ntitles_to_query:\n{titles_to_query}\ndata:\n{data}\n-----\n")
     
         pages = data["query"]["pages"]
-        if "-1" in pages:
-            warn(f"get_wikipedia_pages_ids_from_titles(): missing page for wikipedia page: {pages['-1']}")
-            del pages["-1"]
 
-        for pageid,page_info in pages.items():
-            wikipedia_page_ids_by_lng_and_title[language][page_info["title"]] = pageid
-    return wikipedia_page_ids_by_lng_and_title[language]
+
+        new_dtf_lng_title_wpid = pd.DataFrame(columns=['language', "wikipedia_title", 'wikipedia_id'], data=[
+            (
+                language,
+                page_info["title"],
+                pageid
+            )
+            for pageid,page_info in pages.items()
+        ])
+        return new_dtf_lng_title_wpid
 
 # %%
 
-def get_wikipedia_pages_ids_from_titles(wikipedia_titles:Sequence[str], language:str):
-    """Returns wikipedia page ids from their title, max 50 items at a time
+def get_wikipedia_pages_ids_from_titles(dtf_lang_wptitle:pd.DataFrame):#wikipedia_titles:Sequence[str], language:str):
+    """Returns wikipedia page ids from their title, max 50 items at a time"""
+    global DTF_LANG_WDID_WPTITLE_WPID
+
+    #dtf_lang_wptitle:pd.DataFrame = dataframe_from_cartesian_product(["wikipedia_title", "language"],wikipedia_titles, [language])
     
-    language should be the two-letter abbreviation for desired language"""
-    wikipedia_titles = [t for t in wikipedia_titles if t is not None]
+    dtf_lang_wptitle = dtf_lang_wptitle.loc[~dtf_lang_wptitle.wikipedia_title.isnull()].copy()
 
-    if language not in wikipedia_page_ids_by_lng_and_title:
-        wikipedia_page_ids_by_lng_and_title[language]=dict()
+    dtf_lang_wptitle_to_query = dataframe_only_rows_not_in_dtf2(dtf_lang_wptitle, DTF_LANG_WDID_WPTITLE_WPID, ["wikipedia_title", "language"])
 
-    already_covered_titles = set(
-        t for t in wikipedia_titles
-        if t in wikipedia_page_ids_by_lng_and_title[language]
-    )
-    titles_to_query = [t for t in wikipedia_titles if t not in already_covered_titles]
-
-    rest = list(titles_to_query)
-    while len(rest)>0:
-        current = rest[:50]
-        rest = rest[50:]
-        _get_wikipedia_pages_ids_from_titles_max50(current, language)
-    return wikipedia_page_ids_by_lng_and_title[language]
+    accumulator = pd.DataFrame(columns=DTF_LANG_WDID_WPTITLE_WPID_COLUMNS)
+    for lng in dtf_lang_wptitle_to_query.language.unique():
+        rest = dtf_lang_wptitle_to_query
+        while rest.shape[0]>0:
+            current = rest[:50]
+            rest = rest[50:]
+            new_dtf_dtf_lang_wptitle_wpid = _get_wikipedia_pages_ids_from_titles_max50(current.wikipedia_title, lng)
+            accumulator = accumulator.append(new_dtf_dtf_lang_wptitle_wpid)
+    accumulator = dataframe_only_rows_not_in_dtf2(accumulator, DTF_LANG_WDID_WPTITLE_WPID, ["wikipedia_title", "language"])
+    DTF_LANG_WDID_WPTITLE_WPID = DTF_LANG_WDID_WPTITLE_WPID.append(accumulator)
+    return DTF_LANG_WDID_WPTITLE_WPID
 # %%
 
 
@@ -204,17 +234,25 @@ if __name__=="__main__":
 
     wikidata_ids = ["Q12771","Q3102325","Q78", "Q3044" ]
     languages=["fr", "de", "en"]
+    dtf_lang_wdid:pd.DataFrame = dataframe_from_cartesian_product(["wikidata_id", "language"],wikidata_ids, languages)
 
-    wikipedia_titles_by_language = get_wikipedia_page_titles_from_wikidata_ids(wikidata_ids, languages)
+    wikidata_ids2 = ["Q1","Q78", "Q3044" ]
+    languages2=[ "de"]
+    dtf_lang_wdid2:pd.DataFrame = dataframe_from_cartesian_product(["wikidata_id", "language"],wikidata_ids2, languages2)
+    
+    #dtf_lang_wdid3 = dtf_lang_wdid2[dtf_lang_wdid2.wikidata.isin(dtf_lang_wdid.wikidata) ]
 
+    dtf_lang_wdid_wptitle = get_wikipedia_page_titles_from_wikidata_ids(wikidata_ids, languages)
 
+    dtf_lang_wptitle_wpid = get_wikipedia_pages_ids_from_titles(dtf_lang_wdid_wptitle)
 
+    if False:
     # %%
 
-    language="de"
-    wikipedia_titles = wikipedia_titles_by_language[language]
+        language="de"
+        wikipedia_titles = wikipedia_titles_by_language[language]
 
-    # %%
+        # %%
 
-    page_titles_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, languages)
-    # %%
+        page_titles_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, languages)
+        # %%
