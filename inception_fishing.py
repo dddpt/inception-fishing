@@ -64,12 +64,16 @@ class Annotation:
         self.wikidata_entity_id = Annotation.get_wikidata_id_from_url(new_url)
     def set_mention(self, document:Document):
         self.mention = document.text[self.start:self.end]
-    def set_wikipedia_title_and_id(self, wikipedia_titles_and_ids=dict(), language=None):
-        if len(wikipedia_titles_and_ids)==0 and language is not None:
+    def set_wikipedia_title_and_id(self, language, wikipedia_titles_and_ids=None):
+        if wikipedia_titles_and_ids is None:
             wikipedia_titles_and_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids([self.wikidata_entity_id], [language])
-        if self.wikidata_entity_id in wikipedia_titles_and_ids:
-            self.wikipedia_page_title = wikipedia_titles_and_ids[self.wikidata_entity_id][0]
-            self.wikipedia_page_id = wikipedia_titles_and_ids[self.wikidata_entity_id][1]
+        annotation_row = wikipedia_titles_and_ids.loc[
+            (wikipedia_titles_and_ids.wikidata_id==self.wikidata_entity_id) &
+            (wikipedia_titles_and_ids.language==language)
+        ]
+        if annotation_row.shape[0]>=1:
+            self.wikipedia_page_title = annotation_row.wikipedia_title.values[0]
+            self.wikipedia_page_id = annotation_row.wikipedia_id.values[0]
     def __hash__(self):
         return hash((self.start, self.end, self.wikidata_entity_id, self.grobid_tag))
     def __eq__(self, other):
@@ -315,13 +319,12 @@ class Corpus:
             for a in d.annotations
             if a.wikidata_entity_id is not None
         }
-        wikipedia_page_titles_and_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, [language])
-        return wikipedia_page_titles_and_ids[language]
+        return get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, [language])
     def set_annotations_wikipedia_page_titles_and_ids(self, language):
         wikipedia_page_titles_and_ids = self.get_annotations_wikipedia_page_titles_and_ids(language)
         for d in self.documents:
             for a in d.annotations:
-                a.set_wikipedia_title_and_id(wikipedia_page_titles_and_ids)
+                a.set_wikipedia_title_and_id(language, wikipedia_page_titles_and_ids)
 
     def entity_fishing_to_xml_tag(self, **document_kwargs):
         corpus_tag = ET.Element(self.name+".entityAnnotation")
