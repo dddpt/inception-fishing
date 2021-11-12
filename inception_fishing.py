@@ -5,6 +5,7 @@ from os import path, listdir
 import re
 from typing import Sequence
 
+from pandas import isnull
 import xml.etree.ElementTree as ET
 
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
@@ -41,7 +42,7 @@ class Annotation:
         """Creates Annotation, end is non-inclusive"""
         self.start:int = start
         self.end:int = end
-        self.wikidata_entity_id:str = wikidata_entity_id
+        self.wikidata_entity_id:str = wikidata_entity_id if wikidata_entity_id!="null" else None
         if (self.wikidata_entity_id is None) and (wikidata_entity_url is not None):
             self.wikidata_entity_url = wikidata_entity_url
         self.wikipedia_page_id:str = wikipedia_page_id
@@ -73,7 +74,11 @@ class Annotation:
         ]
         if annotation_row.shape[0]>=1:
             self.wikipedia_page_title = annotation_row.wikipedia_title.values[0]
+            if self.wikipedia_page_title=="null" or isnull(self.wikipedia_page_title):
+                self.wikipedia_page_title = None
             self.wikipedia_page_id = annotation_row.wikipedia_id.values[0]
+            if self.wikipedia_page_id=="null" or isnull(self.wikipedia_page_title):
+                self.wikipedia_page_id = None            
     def __hash__(self):
         return hash((self.start, self.end, self.wikidata_entity_id, self.grobid_tag))
     def __eq__(self, other):
@@ -93,7 +98,16 @@ class Annotation:
         offset_tag = ET.SubElement(annotation_tag, "offset")
         offset_tag.text = str(self.start)
         length_tag = ET.SubElement(annotation_tag, "length")
-        length_tag.text = str(self.length)
+        length_tag.text = str(self.length) 
+        if self.wikidata_entity_id is not None:
+            wikidata_id_tag = ET.SubElement(annotation_tag, "wikidataId") 
+            wikidata_id_tag.text = wikidata_entity_base_url+str(self.wikidata_entity_id)
+        if self.wikipedia_page_title is not None:
+            wikipedia_title_tag = ET.SubElement(annotation_tag, "wikiName") 
+            wikipedia_title_tag.text = str(self.wikipedia_page_title)
+        if self.wikipedia_page_id is not None:
+            wikipedia_id_tag = ET.SubElement(annotation_tag, "wikipediaId")
+            wikipedia_id_tag.text = str(self.wikipedia_page_id)
         if self.mention is not None:
             mention_tag = ET.SubElement(annotation_tag, "mention")
             mention_tag.text = self.mention
