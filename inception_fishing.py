@@ -253,8 +253,11 @@ class Document:
         for a in self.annotations:
             document_tag.append(a.entity_fishing_to_xml_tag(**annotation_kwargs))
         return document_tag
-        
-            
+    
+    def spacy_to_doc(self, spacy_nlp):
+        """Transforms the Document into a spacy doc, adds annotations to tokens."""
+        spacy_doc = spacy_nlp(self.text)
+        return spacy_doc
 
     def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
