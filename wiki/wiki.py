@@ -99,7 +99,7 @@ def get_wikipedia_page_titles_from_wikidata_ids(wikidata_ids:Sequence[str], lang
 
     languages should be an array of two-letter abbreviations for desired languages
 
-    note: this function returns an accumulator that accumulates endlessly over a program run.
+    note: this function returns a global accumulator that accumulates this function's results over a program run.
     always iterate over your own wikidata_ids, not this function result. consider further optimization if long runs.
     """
     global DTF_LANG_WDID_WPTITLE
