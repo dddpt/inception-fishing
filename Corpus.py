@@ -69,6 +69,11 @@ class Corpus:
             {"name": self.name,
             "documents": [d.name for d in self.documents]}
         )
+    def __deepcopy__(self) -> Corpus:
+        return Corpus(
+            self.name,
+            [d.__deepcopy__() for d in self.documents],
+        )
     @staticmethod
     def inception_from_directory(
             name,

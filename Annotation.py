@@ -81,6 +81,18 @@ class Annotation:
         return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute_name}="{self.wikidata_entity_url}"/>'
     def __repr__(self):
         return get_attributes_string("Annotation",self.__dict__)
+    def __copy__(self) -> Annotation:
+        return Annotation(
+            self.start,
+            self.end,
+            wikidata_entity_id = self.wikidata_entity_id,
+            wikipedia_page_id = self.wikipedia_page_id,
+            wikipedia_page_title = self.wikipedia_page_title,
+            mention = self.mention,
+            grobid_tag = self.grobid_tag
+        )
+    def __deepcopy__(self) -> Annotation:
+        return self.__copy__()
     def entity_fishing_to_xml_tag(self, include_grobid_tag=False):
         annotation_tag = ET.Element("annotation")
         offset_tag = ET.SubElement(annotation_tag, "offset")

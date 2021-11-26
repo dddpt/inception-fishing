@@ -76,6 +76,8 @@ class Document:
     def remove_nested_annotations(self):
         nesting_levels = self.get_annotations_nesting_level()
         self.annotations = [a for a in self.annotations if nesting_levels[a]==0]
+    def filter_annotations(self, filter):
+        self.annotations = [a for a in self.annotations if filter(a)]
     def entity_fishing_get_text_from_corpus_folder(self, corpus_folder):
         text_file_path = path.join(corpus_folder, self.name) if corpus_folder else self.name
         with open(text_file_path) as f:
@@ -83,6 +85,12 @@ class Document:
                 return self.text
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
+    def __deepcopy__(self) -> Document:
+        return Document(
+            self.name,
+            [a.__deepcopy__() for a in self.annotations],
+            self.text
+        )
     def entity_fishing_to_xml_tag(self, **annotation_kwargs):
         document_tag = ET.Element("document")
         document_tag.set("docName", self.name)
@@ -148,7 +156,6 @@ class Document:
             filename=self.name
         with open(path.join(folder,filename), "w") as outfile:
             outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
-    @staticmethod
     
     @staticmethod
     def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None) -> Document:
