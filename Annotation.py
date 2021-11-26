@@ -1,9 +1,11 @@
 
 from __future__ import annotations
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
+from warnings import warn
 
 from pandas import isnull
+from spacy.tokens import Token
 import xml.etree.ElementTree as ET
 
 from .utils import wikidata_entity_base_url, get_attributes_string, inception_being_regex, inception_end_regex
@@ -102,6 +104,15 @@ class Annotation:
             grobid_tag_tag.text = self.grobid_tag
         return annotation_tag
     
+    def spacy_get_tokens(self, spacy_doc) -> Sequence[Token]:
+        #print(f"A.spacy_get_tokens() for {self}")
+        tokens = [t for t in spacy_doc if (self.start <= t.idx < self.end)]
+        if any((t.idx+len(t))>self.end for t in tokens):
+            warn(f"Annotation.spacy_get_tokens() tokens {[ f'token({t.text}, idx={t.idx}, len={len(t)}))' for t in tokens if (t.idx+len(t))>self.end]} overlapping with Annotation's end: {self}")
+        if any((t.idx<self.start) and ((t.idx+len(t))>self.start) for t in spacy_doc):
+            warn(f"Annotation.spacy_get_tokens() tokens {[f'token({t.text}, idx={t.idx}, len={len(t)}))'  for t in tokens if (t.idx<self.start) and ((t.idx+len(t))>self.start)]} overlapping with Annotation's start: {self}")
+        return tokens
+
     @staticmethod
     def get_wikidata_id_from_url(wikidata_url):
         if (wikidata_url is not None) and wikidata_url!="null":
@@ -115,7 +126,7 @@ class Annotation:
         <annotation>
 			<mention>14.1</mention>
 			<wikiName>14 und 1 endlos</wikiName>
-			<wikidataId>Q7468888</wikidataId>
+			<wikidataId>http://www.wikidata.org/entity/Q7468888</wikidataId>
 			<wikipediaId>3677337</wikipediaId>
 			<offset>0</offset>
 			<length>4</length>
@@ -123,12 +134,14 @@ class Annotation:
         """
         offset = int(ef_xml_annotation_tag.find("offset").text)
         length = int(ef_xml_annotation_tag.find("length").text)
-        wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
-        wikidata_id = ef_xml_annotation_tag.find("wikidataId").text
-        wikipedia_page_id = ef_xml_annotation_tag.find("wikipediaId").text
-        wikipedia_page_title = ef_xml_annotation_tag.find("wikiName").text
         mention = ef_xml_annotation_tag.find("mention").text
-        return Annotation(offset, offset+length, wikidata_id, wikipedia_page_id, wikipedia_page_title, mention)
+        wikidata_url = ef_xml_annotation_tag.find("wikidataId")
+        wikidata_url = wikidata_url.text if wikidata_url is not None else None
+        wikipedia_page_id = ef_xml_annotation_tag.find("wikipediaId")
+        wikipedia_page_id = wikipedia_page_id.text if wikipedia_page_id is not None else None
+        wikipedia_page_title = ef_xml_annotation_tag.find("wikiName")
+        wikipedia_page_title = wikipedia_page_title.text if wikipedia_page_title is not None else None
+        return Annotation(offset, offset+length, None, wikipedia_page_id, wikipedia_page_title, wikidata_url, mention)
     @staticmethod
     def inception_from_tag_string(
             tag_string,

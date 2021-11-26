@@ -5,13 +5,18 @@ from os import path, listdir
 import re
 from typing import Sequence
 
+from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
 
 from .Annotation import Annotation
-from .utils import wikidata_entity_base_url, get_attributes_string, inception_being_regex, inception_end_regex, INCEPTION_DEFAULT_TAGSET_TAG_STR
+from .utils import get_attributes_string, INCEPTION_DEFAULT_TAGSET_TAG_STR, spacy_token_to_tsv_line, inception_correct_name_encoding_errors
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 
 # %%
+
+
+# %%
+
 
 class Document:
     def __init__(self, name:str, annotations, text = ""):
@@ -29,10 +34,10 @@ class Document:
         annotation_indexation_shift = replacement_length - replaced_length
         new_text = self.text[:start] + replacement + self.text[end:]
         for a in self.annotations:
-            start_between = (a.start >= start) and (a.start <end) 
-            end_between = (a.end >= start) and (a.end <end)
-            print(f"start_between: {start_between}, end_between: {end_between}")
-            if start_between != end_between:
+            a_starts_in_replacement = (a.start >= start) and (a.start <end) 
+            a_ends_in_replacement = (a.end > start) and (a.end <end)
+            # print(f"start_between: {start_between}, end_between: {end_between}")
+            if a_starts_in_replacement != a_ends_in_replacement:
                 raise Exception(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} intersects with {a}. Text:\n{self.text}")
             if a.start >= end:
                 a.start += annotation_indexation_shift
@@ -43,9 +48,11 @@ class Document:
 
     def replace_regex(self, to_replace_regex, replacement):
         total_shift = 0
-        for match in re.finditer(to_replace_regex, self.text):
+        match = re.search(to_replace_regex, self.text)
+        while match is not None:
             start, end = match.span()
             total_shift += self.replace_span(start, end, replacement)
+            match = re.search(to_replace_regex, self.text)
         return total_shift    
     def update_mentions(self):
         for a in self.annotations:
@@ -83,10 +90,39 @@ class Document:
             document_tag.append(a.entity_fishing_to_xml_tag(**annotation_kwargs))
         return document_tag
     
-    def spacy_to_doc(self, spacy_nlp):
+    def spacy_to_doc(self, spacy_nlp) -> Doc:
         """Transforms the Document into a spacy doc, adds annotations to tokens."""
-        spacy_doc = spacy_nlp(self.text)
+        spacy_doc:Doc = spacy_nlp(self.text)
+        #print(f"Doc.spacy_to_doc() for {self.name}")
+        for t in spacy_doc:
+            if not t.has_extension("wikidata_entity_id"):
+                t.set_extension("wikidata_entity_id", default="")
+            if not t.has_extension("wikipedia_page_id"):
+                t.set_extension("wikipedia_page_id", default="")
+        for a in self.annotations:
+            tokens = a.spacy_get_tokens(spacy_doc)
+            for t in tokens:
+                t._.wikidata_entity_id = a.wikidata_entity_id
+                t._.wikipedia_page_id = a.wikipedia_page_id
         return spacy_doc
+
+    def clef_hipe_scorer_to_conllu_tsv(self, spacy_nlp,
+            language="fr", date="1918-11-08", newspaper= "DHS",
+            **spacy_token_to_tsv_line_kwargs
+        ) -> str:
+        intro = f"# language = {language}									\n" + \
+                f"# newspaper = {newspaper}									\n" + \
+                f"# date = {date}									\n" + \
+                f"# document_id = {self.name}									\n"
+        sentence_intro = f"# segment_iiif_link = _									\n"
+
+        spacy_doc = self.spacy_to_doc(spacy_nlp)
+        sentence_tsv_lines = sentence_intro + "\n".join([
+            spacy_token_to_tsv_line(t, **spacy_token_to_tsv_line_kwargs)
+            for t in spacy_doc
+        ])
+            
+        return intro+sentence_tsv_lines
 
     def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
@@ -113,11 +149,7 @@ class Document:
         with open(path.join(folder,filename), "w") as outfile:
             outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
     @staticmethod
-    def inception_correct_name_encoding_errors(name):
-        encoding_errors = {"├д": "ä", "├╝": "ü"}
-        for err, corr in encoding_errors.items():
-            name = name.replace(err, corr)
-        return name
+    
     @staticmethod
     def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None) -> Document:
         """Returns a Document from a lxml etree entity-fishing document tag"""
@@ -137,7 +169,7 @@ class Document:
         text_regex = r'sofaString="(.+?)"'
         text = re.search(text_regex, document_string).group(1)
         return Document(
-            Document.inception_correct_name_encoding_errors(name),
+            inception_correct_name_encoding_errors(name),
             annotations,
             text
         )

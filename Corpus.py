@@ -6,7 +6,7 @@ from typing import Sequence
 import xml.etree.ElementTree as ET
 
 from .Document import Document
-from .utils import get_attributes_string
+from .utils import get_attributes_string, clef_hipe_scorer_tsv_columns
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 
 # %%
@@ -46,6 +46,16 @@ class Corpus:
             content = file.read()
         with open(filepath, "w", encoding="utf-8") as file:
             file.write(intro_str+"\n"+content)
+
+    def clef_hipe_scorer_to_conllu_tsv(self, filepath, spacy_nlp, **document_kwargs):
+        doc_tsv_separator = "\n"+(2*"									\n")
+        alphabetic_ordered_docs = sorted(self.documents, key= lambda d: d.name)
+        tsv_docs = [d.clef_hipe_scorer_to_conllu_tsv(spacy_nlp, **document_kwargs) for d in alphabetic_ordered_docs]
+
+        tsv_content = "\t".join(clef_hipe_scorer_tsv_columns)+"\n"+doc_tsv_separator.join(tsv_docs)
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(tsv_content)
+        return tsv_content
 
     @staticmethod
     def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None) -> Corpus:
