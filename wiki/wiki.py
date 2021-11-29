@@ -14,15 +14,6 @@ https://www.wikidata.org/w/api.php?format=json&action=wbgetentities&ids=Q78|Q304
 https://en.wikipedia.org/w/api.php?action=query&titles=Fribourg&format=json
 """
 
-"""
-
-Change proposition
-- using pandas:
-    1 dtf for lng, wikidata_id, wikipedia_title
-    1 dtf for lng, wikidata_id, wikipedia_title, wikipedia_id
-- writing to csv at end of each exec
-"""
-
 # %%
 script_folder = path.dirname(__file__)
 
