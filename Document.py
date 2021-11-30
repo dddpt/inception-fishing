@@ -10,7 +10,6 @@ import xml.etree.ElementTree as ET
 
 from .Annotation import Annotation
 from .utils import get_attributes_string, INCEPTION_DEFAULT_TAGSET_TAG_STR, spacy_token_to_tsv_line, inception_correct_name_encoding_errors
-from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 
 # %%
 

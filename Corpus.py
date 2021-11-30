@@ -17,7 +17,7 @@ class Corpus:
         self.documents:Sequence[Document] = documents
             
     def get_annotations_wikipedia_page_titles_and_ids(self, language):
-        """Only works for corpus with <=50 unique entities in annotations"""
+        """Gets annotations wikipedia page title and ids from their wikidata id"""
         wikidata_ids = {
             a.wikidata_entity_id
             for d in self.documents
