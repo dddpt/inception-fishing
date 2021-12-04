@@ -129,7 +129,7 @@ class Document:
             for t in spacy_doc
         ])
             
-        return intro+sentence_tsv_lines
+        return intro+sentence_tsv_lines[:-1]+"EndOfLine|EndOfParagraph"
 
     def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
         """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
