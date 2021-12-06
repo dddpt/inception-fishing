@@ -1,7 +1,7 @@
 
 
 from __future__ import annotations
-from os import path, listdir
+from os import path, listdir, replace
 import re
 from typing import Sequence
 
@@ -24,13 +24,20 @@ class Document:
         self.text:str = text
     
     def replace_span(self, start, end, replacement):
-        """Replaces given span
+        """Replaces given span in Document text
         
-        Throws an exception if both 
+        Throws an exception if span intersects with an existing annotation
+
+        returns an incremental match, a tuple consisting of:
+        0) start
+        1) span original content
+        2) replacement
+        3) annotation_indexation_shift
         """
         replaced_length = end-start
         replacement_length=len(replacement)
         annotation_indexation_shift = replacement_length - replaced_length
+        old_span_content = self.text[start:end]
         new_text = self.text[:start] + replacement + self.text[end:]
         for a in self.annotations:
             a_starts_in_replacement = (a.start >= start) and (a.start <end) 
@@ -43,16 +50,40 @@ class Document:
             if a.end >= end:
                 a.end += annotation_indexation_shift
         self.text=new_text
-        return annotation_indexation_shift
+        return (start, old_span_content, replacement, annotation_indexation_shift)
 
     def replace_regex(self, to_replace_regex, replacement):
-        total_shift = 0
+        """Replaces the given regex in the text
+
+        returns the list of incremental matches tuples from replace_span(), see replace_span() doc
+
+        Not that incremental matches' starts are incrementally computed and do not directly correspond to the new Document text.
+        If you want to re-modify the replacements, you have to do so in reverse order for starts to match.
+        """
         match = re.search(to_replace_regex, self.text)
+        incremental_matches = []
         while match is not None:
             start, end = match.span()
-            total_shift += self.replace_span(start, end, replacement)
+            incremental_matches.append((start, self.text[start:end]))
+            incremental_matches.append(self.replace_span(start, end, replacement))
             match = re.search(to_replace_regex, self.text)
-        return total_shift    
+        return incremental_matches
+    def reverse_replace_span(self, incremental_match):
+        """Reverse a single replace_span() call from its incremental_match return
+        
+        see replace_span() doc
+        """
+        start, original_content, replacement, shift = incremental_match
+        self.replace_span(start, start+len(replacement), original_content)
+    def reverse_consecutive_replace_span(self, incremental_matches):
+        """Reverse a consecutive list of replace_span() call from their incremental_matches list
+        
+        typically used to reverse a replace_regex() call
+        """
+        return [
+            self.reverse_replace_span(incremental_match)
+            for incremental_match in incremental_matches.reverse()
+        ]
     def update_mentions(self):
         for a in self.annotations:
             a.set_mention(self)
