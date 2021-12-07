@@ -5,6 +5,7 @@ from csv import DictReader
 from os import path, listdir, replace
 import re
 from typing import Dict, Sequence
+from warnings import warn
 
 from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
@@ -40,16 +41,28 @@ class Document:
         annotation_indexation_shift = replacement_length - replaced_length
         old_span_content = self.text[start:end]
         new_text = self.text[:start] + replacement + self.text[end:]
+        annotations_to_remove = set()
         for a in self.annotations:
-            a_starts_in_replacement = (a.start >= start) and (a.start <end) 
-            a_ends_in_replacement = (a.end > start) and (a.end <end)
+            #a_starts_in_replacement = (a.start >= start) and (a.start <end) 
+            #a_ends_in_replacement = (a.end > start) and (a.end > end)
+            replacement_starts_in_a = (start >= a.start) and (start < a.end) 
+            replacement_ends_in_a = (end > a.start) and (end <= a.end)
+            replacement_is_around_a = (start <= a.start and end>a.end) or (start < a.start and end>=a.end)
             # print(f"start_between: {start_between}, end_between: {end_between}")
-            if a_starts_in_replacement != a_ends_in_replacement:
+            if replacement_is_around_a:
+                warn(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} englobes annotation {a}. This annotation is removed from document.")
+                annotations_to_remove.add(a)
+            elif replacement_starts_in_a != replacement_ends_in_a:
                 raise Exception(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} intersects with {a}. Text:\n{self.text}")
-            if a.start >= end:
-                a.start += annotation_indexation_shift
-            if a.end >= end:
-                a.end += annotation_indexation_shift
+            else:
+                if a.start >= end:
+                    a.start += annotation_indexation_shift
+                if a.end >= end:
+                    a.end += annotation_indexation_shift
+        self.annotations = [
+            a for a in self.annotations
+            if a not in annotations_to_remove
+        ]
         self.text=new_text
         return (start, old_span_content, replacement, annotation_indexation_shift)
 
@@ -219,60 +232,79 @@ class Document:
                 document_name = file_path
             return Document.inception_from_string(document_name, document_string, **inception_from_string_kwargs)
     @staticmethod
-    def from_dhs_article(dhs_article, dhs_wikidata_wikipedia_links:Sequence[Dict]|None = None, text_blocks_separator = "\n"):
-        """Creates a document from a dhs_article annotating text blocks and text_links
+    def from_dhs_article(
+        dhs_article,
+        dhs_wikidata_wikipedia_links_dict:Dict[str,Dict]|None = None,
+        text_blocks_separator = "\n",
+        wikipedia_page_name_language = "fr"
+    ):
+        """Creates a document from a dhs_article annotating text blocks and text_links 
         
-        dhs_wikidata_wikipedia_links should be None or a list of dict with fields:
-        - item (wikidata id)
-        - itemLabel 
-        - dhsid
-        - namefr (wikipedia name fr)
-        - articlefr (wikipedia url fr)
-        - namede
-        - articlede
-        - nameit
-        - articleit
-        - nameen
-        - articleen
-        - instanceof
-        - instanceofLabel
-        - gndid
+        dhs_wikidata_wikipedia_links should be a dict of dict with structure:
+        {dhs-id: dict(
+            - item (wikidata id)
+            - itemLabel 
+            - dhsid
+            - namefr (wikipedia name fr)
+            - articlefr (wikipedia url fr)
+            - namede
+            - articlede
+            - nameit
+            - articleit
+            - nameen
+            - articleen
+            - instanceof
+            - instanceofLabel
+            - gndid
+        )}
 
+        Creates to two types of annotations:
+        - annotations for text blocks with extra_fields "dhs_type"->"text_block" and "dhs_html_tag"->html tag name
+        - annotations for text links with extra_fields "dhs_type"->"text_link", "dhs_id"->dhs_id and "dhs_href"->internal dhs link
         """
-        # handling text blocks:
+        if dhs_wikidata_wikipedia_links_dict is None:
+            dhs_wikidata_wikipedia_links_dict=dict()
+        
+        annotations:Sequence[Annotation] = []
+        dhs_article_id_from_url_regex = re.compile(r"(fr|de|it)/articles/(\d+)/")
+
+        # assembling text blocks as annotations
         text_blocks = dhs_article.parse_text_blocks()
         whole_text = ""
-        annotations = []
         for tag, text in text_blocks:
             new_whole_text = whole_text+text
             annotations.append(Annotation(
                 len(whole_text),
                 len(new_whole_text),
-                extra_fields = {"type": "text_block", "dhs_html_tag": tag}
+                extra_fields = {"dhs_type": "text_block", "dhs_html_tag": tag}
             ))
             whole_text = new_whole_text+text_blocks_separator
 
-        # adding text_links
-
-        if dhs_wikidata_wikipedia_links is not None: 
-            dhs_wikidata_wikipedia_links = {
-                l["item"]: l
-                for l in dhs_wikidata_wikipedia_links
-            }
-        else:
-            dhs_wikidata_wikipedia_links=dict()
+        # assembling text links as annotations with wikidata ids
         text_links_per_blocks = dhs_article.parse_text_links()
         for i, text_links in enumerate(text_links_per_blocks):
             text_block_start = annotations[i].start
-            for start, end, mention, href in text_links:
-                wikidata_entity_id = None
-                if dhs_wikidata_wikipedia_links is not None:
-                    wikidata_entity_id = dhs_wikidata_wikipedia_links
+            for text_link in text_links:
+                start, end, mention, href = text_link.values()
+                # get text link correspondance in wikidata & wikipedia (if present)
+                wikidata_entity_url = None
+                wikipedia_page_title = None
+                dhs_id_match = dhs_article_id_from_url_regex.search(href)
+                if dhs_id_match:
+                    dhs_id = dhs_id_match.group(2)
+                    wikidata_entry = dhs_wikidata_wikipedia_links_dict.get(dhs_id)
+                    if wikidata_entry:
+                        wikidata_entity_url = wikidata_entry["item"]
+                        wikidata_entity_url = wikidata_entity_url if wikidata_entity_url!="" else None
+                        wikipedia_page_title = wikidata_entry["name"+wikipedia_page_name_language]
+                        wikipedia_page_title = wikipedia_page_title if wikipedia_page_title!="" else None
                 annotations.append(Annotation(
                     text_block_start+start,
                     text_block_start+end,
+                    wikidata_entity_url = wikidata_entity_url,
+                    wikipedia_page_title = wikipedia_page_title,
                     mention = mention,
-                    extra_fields={"type": "text_link", "dhs_href": href}
+                    extra_fields={"dhs_type": "text_link", "dhs_href": href, "dhs_id": dhs_id}
                 ))
                 
         return Document(dhs_article.title, annotations, whole_text)

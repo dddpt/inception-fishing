@@ -73,7 +73,7 @@ class Annotation:
         return hash((self.start, self.end, self.wikidata_entity_id, self.grobid_tag))
     def __eq__(self, other):
         if type(other) is type(self):
-            return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_id==self.wikidata_entity_id) and (other.end==self.grobid_tag)
+            return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_id==self.wikidata_entity_id) and (other.grobid_tag==self.grobid_tag)
         return False
     def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity", identifier_attribute_name="identifier"):
         """Returns a valid <type3:NamedEntity/> tag string for inception's UIMA CAS XMI (XML 1.1) format
