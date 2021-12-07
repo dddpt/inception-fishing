@@ -1,9 +1,10 @@
 
 
 from __future__ import annotations
+from csv import DictReader
 from os import path, listdir, replace
 import re
-from typing import Sequence
+from typing import Dict, Sequence
 
 from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
@@ -217,6 +218,65 @@ class Document:
             if document_name is None:
                 document_name = file_path
             return Document.inception_from_string(document_name, document_string, **inception_from_string_kwargs)
+    @staticmethod
+    def from_dhs_article(dhs_article, dhs_wikidata_wikipedia_links:Sequence[Dict]|None = None, text_blocks_separator = "\n"):
+        """Creates a document from a dhs_article annotating text blocks and text_links
+        
+        dhs_wikidata_wikipedia_links should be None or a list of dict with fields:
+        - item (wikidata id)
+        - itemLabel 
+        - dhsid
+        - namefr (wikipedia name fr)
+        - articlefr (wikipedia url fr)
+        - namede
+        - articlede
+        - nameit
+        - articleit
+        - nameen
+        - articleen
+        - instanceof
+        - instanceofLabel
+        - gndid
+
+        """
+        # handling text blocks:
+        text_blocks = dhs_article.parse_text_blocks()
+        whole_text = ""
+        annotations = []
+        for tag, text in text_blocks:
+            new_whole_text = whole_text+text
+            annotations.append(Annotation(
+                len(whole_text),
+                len(new_whole_text),
+                extra_fields = {"type": "text_block", "dhs_html_tag": tag}
+            ))
+            whole_text = new_whole_text+text_blocks_separator
+
+        # adding text_links
+
+        if dhs_wikidata_wikipedia_links is not None: 
+            dhs_wikidata_wikipedia_links = {
+                l["item"]: l
+                for l in dhs_wikidata_wikipedia_links
+            }
+        else:
+            dhs_wikidata_wikipedia_links=dict()
+        text_links_per_blocks = dhs_article.parse_text_links()
+        for i, text_links in enumerate(text_links_per_blocks):
+            text_block_start = annotations[i].start
+            for start, end, mention, href in text_links:
+                wikidata_entity_id = None
+                if dhs_wikidata_wikipedia_links is not None:
+                    wikidata_entity_id = dhs_wikidata_wikipedia_links
+                annotations.append(Annotation(
+                    text_block_start+start,
+                    text_block_start+end,
+                    mention = mention,
+                    extra_fields={"type": "text_link", "dhs_href": href}
+                ))
+                
+        return Document(dhs_article.title, annotations, whole_text)
+
 
 
 # %%

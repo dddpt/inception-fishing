@@ -25,7 +25,8 @@ class Annotation:
             wikipedia_page_title=None,
             wikidata_entity_url=None,
             mention=None,
-            grobid_tag=None
+            grobid_tag=None,
+            extra_fields=dict()
         ):
         """Creates Annotation, end is non-inclusive"""
         self.start:int = start
@@ -37,6 +38,7 @@ class Annotation:
         self.wikipedia_page_title:str = wikipedia_page_title
         self.grobid_tag:str = grobid_tag
         self.mention:str = mention
+        self.extra_fields:dict = extra_fields
     @property
     def length(self):
         return self.end-self.start
@@ -89,7 +91,8 @@ class Annotation:
             wikipedia_page_id = self.wikipedia_page_id,
             wikipedia_page_title = self.wikipedia_page_title,
             mention = self.mention,
-            grobid_tag = self.grobid_tag
+            grobid_tag = self.grobid_tag,
+            extra_fields = self.extra_fields.__deepcopy__()
         )
     def __deepcopy__(self) -> Annotation:
         return self.__copy__()
