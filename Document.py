@@ -235,8 +235,9 @@ class Document:
     def from_dhs_article(
         dhs_article,
         dhs_wikidata_wikipedia_links_dict:Dict[str,Dict]|None = None,
-        text_blocks_separator = "\n",
-        wikipedia_page_name_language = "fr"
+        wikipedia_page_name_language = "fr",
+        p_text_blocks_separator = "\n",
+        non_p_text_blocks_separator = "\n",
     ):
         """Creates a document from a dhs_article annotating text blocks and text_links 
         
@@ -278,7 +279,10 @@ class Document:
                 len(new_whole_text),
                 extra_fields = {"dhs_type": "text_block", "dhs_html_tag": tag}
             ))
-            whole_text = new_whole_text+text_blocks_separator
+            if tag =="p":
+                whole_text = new_whole_text+p_text_blocks_separator
+            else:
+                whole_text = new_whole_text+non_p_text_blocks_separator
 
         # assembling text links as annotations with wikidata ids
         text_links_per_blocks = dhs_article.parse_text_links()
