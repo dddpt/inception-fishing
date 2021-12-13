@@ -52,7 +52,7 @@ class Document:
             if replacement_is_around_a:
                 warn(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} englobes annotation {a}. This annotation is removed from document.")
                 annotations_to_remove.add(a)
-            elif replacement_starts_in_a != replacement_ends_in_a:
+            elif replacement_starts_in_a != replacement_ends_in_a and start!=end:
                 raise Exception(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} intersects with {a}. Text:\n{self.text}")
             else:
                 if a.start >= end:

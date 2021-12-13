@@ -1,5 +1,6 @@
 
 from __future__ import annotations
+from copy import deepcopy
 import re
 from typing import TYPE_CHECKING, Sequence
 from warnings import warn
@@ -75,12 +76,17 @@ class Annotation:
         if type(other) is type(self):
             return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_id==self.wikidata_entity_id) and (other.grobid_tag==self.grobid_tag)
         return False
-    def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity", identifier_attribute_name="identifier"):
+    def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity",
+        identifier_attribute_name="identifier",
+        grobid_tag_attribute_name="entityfishingtag"
+    ):
         """Returns a valid <type3:NamedEntity/> tag string for inception's UIMA CAS XMI (XML 1.1) format
 
         Tag & attribute name can be changed
         """
-        return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute_name}="{self.wikidata_entity_url}"/>'
+        identifier_attribute = f' {identifier_attribute_name}="{self.wikidata_entity_url}" ' if self.wikidata_entity_url is not None else ""
+        grobid_tag_attribute = f' {grobid_tag_attribute_name}="{self.grobid_tag}" ' if self.grobid_tag is not None else ""
+        return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute} {grobid_tag_attribute}/>'
     def __repr__(self):
         return get_attributes_string("Annotation",self.__dict__)
     def __copy__(self) -> Annotation:
@@ -92,7 +98,7 @@ class Annotation:
             wikipedia_page_title = self.wikipedia_page_title,
             mention = self.mention,
             grobid_tag = self.grobid_tag,
-            extra_fields = self.extra_fields.__deepcopy__()
+            extra_fields = deepcopy(self.extra_fields)
         )
     def __deepcopy__(self) -> Annotation:
         return self.__copy__()
