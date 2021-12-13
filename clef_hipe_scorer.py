@@ -4,6 +4,7 @@ from spacy.tokens import Token
 from .Annotation import Annotation
 from .Corpus import Corpus
 from .Document import Document
+from .spacy import document_to_spacy_doc
 
 default_tsv_col_to_token_extension = {
     "NEL-LIT": "wikidata_entity_id"
@@ -52,7 +53,7 @@ def document_to_conllu_tsv(document, spacy_nlp,
             f"# document_id = {document.name}									\n"
     sentence_intro = f"# segment_iiif_link = _									\n"
 
-    spacy_doc = document.spacy_to_doc(spacy_nlp)
+    spacy_doc = document_to_spacy_doc(document, spacy_nlp)
     sentence_tsv_lines = sentence_intro + "\n".join([
         spacy_token_to_tsv_line(t, **spacy_token_to_tsv_line_kwargs)
         for t in spacy_doc

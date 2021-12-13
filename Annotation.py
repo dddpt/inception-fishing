@@ -2,11 +2,10 @@
 from __future__ import annotations
 from copy import deepcopy
 import re
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 from warnings import warn
 
 from pandas import isnull
-from spacy.tokens import Token
 
 from .utils import wikidata_entity_base_url, get_attributes_string
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
@@ -90,15 +89,6 @@ class Annotation:
         )
     def __deepcopy__(self) -> Annotation:
         return self.__copy__()
-
-    def spacy_get_tokens(self, spacy_doc) -> Sequence[Token]:
-        #print(f"A.spacy_get_tokens() for {self}")
-        tokens = [t for t in spacy_doc if (self.start <= t.idx < self.end)]
-        if any((t.idx+len(t))>self.end for t in tokens):
-            warn(f"Annotation.spacy_get_tokens() tokens {[ f'token({t.text}, idx={t.idx}, len={len(t)}))' for t in tokens if (t.idx+len(t))>self.end]} overlapping with Annotation's end: {self}")
-        if any((t.idx<self.start) and ((t.idx+len(t))>self.start) for t in spacy_doc):
-            warn(f"Annotation.spacy_get_tokens() tokens {[f'token({t.text}, idx={t.idx}, len={len(t)}))'  for t in tokens if (t.idx<self.start) and ((t.idx+len(t))>self.start)]} overlapping with Annotation's start: {self}")
-        return tokens
 
     @staticmethod
     def get_wikidata_id_from_url(wikidata_url):

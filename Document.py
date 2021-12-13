@@ -7,7 +7,6 @@ import re
 from typing import Dict, Sequence
 from warnings import warn
 
-from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
 
 from .Annotation import Annotation
@@ -130,22 +129,6 @@ class Document:
             [a.__deepcopy__() for a in self.annotations],
             self.text
         )
-    
-    def spacy_to_doc(self, spacy_nlp) -> Doc:
-        """Transforms the Document into a spacy doc, adds annotations to tokens."""
-        spacy_doc:Doc = spacy_nlp(self.text)
-        #print(f"Doc.spacy_to_doc() for {self.name}")
-        for t in spacy_doc:
-            if not t.has_extension("wikidata_entity_id"):
-                t.set_extension("wikidata_entity_id", default="")
-            if not t.has_extension("wikipedia_page_id"):
-                t.set_extension("wikipedia_page_id", default="")
-        for a in self.annotations:
-            tokens = a.spacy_get_tokens(spacy_doc)
-            for t in tokens:
-                t._.wikidata_entity_id = a.wikidata_entity_id
-                t._.wikipedia_page_id = a.wikipedia_page_id
-        return spacy_doc
     @staticmethod
     def from_dhs_article(
         dhs_article,
