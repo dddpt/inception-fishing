@@ -11,7 +11,7 @@ from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
 
 from .Annotation import Annotation
-from .utils import get_attributes_string, spacy_token_to_tsv_line
+from .utils import get_attributes_string
 
 # %%
 
@@ -146,24 +146,6 @@ class Document:
                 t._.wikidata_entity_id = a.wikidata_entity_id
                 t._.wikipedia_page_id = a.wikipedia_page_id
         return spacy_doc
-
-    def clef_hipe_scorer_to_conllu_tsv(self, spacy_nlp,
-            language="fr", date="1918-11-08", newspaper= "DHS",
-            **spacy_token_to_tsv_line_kwargs
-        ) -> str:
-        intro = f"# language = {language}									\n" + \
-                f"# newspaper = {newspaper}									\n" + \
-                f"# date = {date}									\n" + \
-                f"# document_id = {self.name}									\n"
-        sentence_intro = f"# segment_iiif_link = _									\n"
-
-        spacy_doc = self.spacy_to_doc(spacy_nlp)
-        sentence_tsv_lines = sentence_intro + "\n".join([
-            spacy_token_to_tsv_line(t, **spacy_token_to_tsv_line_kwargs)
-            for t in spacy_doc
-        ])
-            
-        return intro+sentence_tsv_lines[:-1]+"EndOfLine|EndOfParagraph"
     @staticmethod
     def from_dhs_article(
         dhs_article,
