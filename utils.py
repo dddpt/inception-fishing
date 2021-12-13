@@ -6,9 +6,6 @@ import re
 from spacy.tokens import Token
 
 # %%
-INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
-inception_being_regex=re.compile(r'begin="(\d+)"')
-inception_end_regex=re.compile(r'end="(\d+)"')
 
 def get_attributes_string(class_name, object_dict):
     """Unimportant utility function to format __str__() and __repr()"""
@@ -53,9 +50,3 @@ def spacy_token_to_tsv_line(
         else:
             line += default
     return line
-
-def inception_correct_name_encoding_errors(name):
-        encoding_errors = {"├д": "ä", "├╝": "ü"}
-        for err, corr in encoding_errors.items():
-            name = name.replace(err, corr)
-        return name
