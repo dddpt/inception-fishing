@@ -11,7 +11,7 @@ from spacy.tokens import Doc, Token
 import xml.etree.ElementTree as ET
 
 from .Annotation import Annotation
-from .utils import get_attributes_string, INCEPTION_DEFAULT_TAGSET_TAG_STR, spacy_token_to_tsv_line, inception_correct_name_encoding_errors
+from .utils import get_attributes_string, spacy_token_to_tsv_line
 
 # %%
 
@@ -164,51 +164,6 @@ class Document:
         ])
             
         return intro+sentence_tsv_lines[:-1]+"EndOfLine|EndOfParagraph"
-
-    def inception_to_xml_string(self, force_single_sentence=False, annotations_xmi_ids_start = 9000, tagset_tag_str=INCEPTION_DEFAULT_TAGSET_TAG_STR, **named_entity_to_tag_kwargs):
-        """Returns a valid inception input file content in UIMA CAS XMI (XML 1.1) format
-        
-        Note: replaces " characters in text wth ', to simplify handling of XML.
-        force_single_sentence=True forces the whole document text to be considered as a single sentence by inception,
-        useful when text contains non-sentence-inducing dots (such as abbreviation dots in the DHS)
-        """
-        annotations_str ="\n            ".join(ne.inception_to_tag_string(annotations_xmi_ids_start+i, **named_entity_to_tag_kwargs) for i, ne in enumerate(self.annotations))
-        force_single_sentence_str = f'\n            <type4:Sentence xmi:id="8998" sofa="1" begin="0" end="{len(self.text)}"/>' if force_single_sentence else ""
-        return f'''
-        <?xml version="1.1" encoding="UTF-8"?>
-        <xmi:XMI xmlns:pos="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/pos.ecore" xmlns:tcas="http:///uima/tcas.ecore" xmlns:xmi="http://www.omg.org/XMI" xmlns:cas="http:///uima/cas.ecore" xmlns:tweet="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/pos/tweet.ecore" xmlns:morph="http:///de/tudarmstadt/ukp/dkpro/core/api/lexmorph/type/morph.ecore" xmlns:dependency="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/dependency.ecore" xmlns:type5="http:///de/tudarmstadt/ukp/dkpro/core/api/semantics/type.ecore" xmlns:type8="http:///de/tudarmstadt/ukp/dkpro/core/api/transform/type.ecore" xmlns:type7="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type.ecore" xmlns:type2="http:///de/tudarmstadt/ukp/dkpro/core/api/metadata/type.ecore" xmlns:type9="http:///org/dkpro/core/api/xml/type.ecore" xmlns:type3="http:///de/tudarmstadt/ukp/dkpro/core/api/ner/type.ecore" xmlns:type4="http:///de/tudarmstadt/ukp/dkpro/core/api/segmentation/type.ecore" xmlns:type="http:///de/tudarmstadt/ukp/dkpro/core/api/coref/type.ecore" xmlns:type6="http:///de/tudarmstadt/ukp/dkpro/core/api/structure/type.ecore" xmlns:constituent="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/constituent.ecore" xmlns:chunk="http:///de/tudarmstadt/ukp/dkpro/core/api/syntax/type/chunk.ecore" xmlns:custom="http:///webanno/custom.ecore" xmi:version="2.0">
-            <cas:NULL xmi:id="0"/>
-            {annotations_str}{force_single_sentence_str}
-            {tagset_tag_str}
-            <cas:Sofa xmi:id="1" sofaNum="1" sofaID="_InitialView" mimeType="text" sofaString="{self.text.replace('"', "'")}"/>
-            <cas:View sofa="1" members="{("8998 " if force_single_sentence else "")}8999 {" ".join(str(annotations_xmi_ids_start+i) for i, ne in enumerate(self.annotations))}"/>
-        </xmi:XMI>
-        '''.replace("\n    ","\n").strip()
-    def inception_to_xml_file(self, folder="./", filename=None, **inception_to_xml_string_kwargs):
-        if not filename:
-            filename=self.name
-        with open(path.join(folder,filename), "w") as outfile:
-            outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
-    
-    @staticmethod
-    def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs) -> Document:
-        named_entity_tag_regex = "<"+named_entity_tag_name+r"\W.+?/>"
-        tags = re.findall(named_entity_tag_regex, document_string)
-        annotations = [Annotation.inception_from_tag_string(t, **named_entity_parser_kwargs) for t in tags if named_entity_tag_name in t]
-        text_regex = r'sofaString="(.+?)"'
-        text = re.search(text_regex, document_string).group(1)
-        return Document(
-            inception_correct_name_encoding_errors(name),
-            annotations,
-            text
-        )
-    @staticmethod
-    def inception_from_file(file_path, document_name=None, **inception_from_string_kwargs) -> Document:
-        with open(file_path) as file:
-            document_string = file.read()
-            if document_name is None:
-                document_name = file_path
-            return Document.inception_from_string(document_name, document_string, **inception_from_string_kwargs)
     @staticmethod
     def from_dhs_article(
         dhs_article,

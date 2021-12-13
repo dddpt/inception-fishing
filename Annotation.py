@@ -8,7 +8,7 @@ from warnings import warn
 from pandas import isnull
 from spacy.tokens import Token
 
-from .utils import wikidata_entity_base_url, get_attributes_string, inception_being_regex, inception_end_regex
+from .utils import wikidata_entity_base_url, get_attributes_string
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 if TYPE_CHECKING:
     from .Document import Document
@@ -75,17 +75,6 @@ class Annotation:
         if type(other) is type(self):
             return (other.start==self.start) and (other.end==self.end) and (other.wikidata_entity_id==self.wikidata_entity_id) and (other.grobid_tag==self.grobid_tag)
         return False
-    def inception_to_tag_string(self, xmi_id, tag_name="type3:NamedEntity",
-        identifier_attribute_name="identifier",
-        grobid_tag_attribute_name="entityfishingtag"
-    ):
-        """Returns a valid <type3:NamedEntity/> tag string for inception's UIMA CAS XMI (XML 1.1) format
-
-        Tag & attribute name can be changed
-        """
-        identifier_attribute = f' {identifier_attribute_name}="{self.wikidata_entity_url}" ' if self.wikidata_entity_url is not None else ""
-        grobid_tag_attribute = f' {grobid_tag_attribute_name}="{self.grobid_tag}" ' if self.grobid_tag is not None else ""
-        return f'<{tag_name} xmi:id="{xmi_id}" sofa="1" begin="{self.start}" end="{self.end}" {identifier_attribute} {grobid_tag_attribute}/>'
     def __repr__(self):
         return get_attributes_string("Annotation",self.__dict__)
     def __copy__(self) -> Annotation:
@@ -116,42 +105,5 @@ class Annotation:
         if (wikidata_url is not None) and wikidata_url!="null":
             return wikidata_url.replace(wikidata_entity_base_url, "") 
         return None
-    @staticmethod
-    def inception_from_tag_string(
-            tag_string,
-            identifier_attribute_name="identifier",
-            grobid_tag_attribute_name="entityfishingtag",
-            wikipedia_titles_and_ids=dict()
-        ) -> Annotation:
-        """
-    
-        <custom:Entityfishinglayer xmi:id="3726" sofa="1" begin="224" end="244" entityfishingtag="INSTALLATION" wikidataidentifier="http://www.wikidata.org/entity/Q2971666"/>
-        """
-        offset_match = inception_being_regex.search(tag_string)
-        end_match = inception_end_regex.search(tag_string)
-        if (not offset_match) or (not end_match):
-            raise Exception(f"Annotation.inception_from_tag_string() missing begin or end attribute in tag: {tag_string}")
-        offset = int(offset_match.group(1))
-        end = int(end_match.group(1))
-
-        grobid_tag_match = re.search(grobid_tag_attribute_name+r'="(.+?)"', tag_string)
-        grobid_tag = grobid_tag_match.group(1) if grobid_tag_match else None
-
-        identifier_match = re.search(identifier_attribute_name+r'="(.+?)"', tag_string)
-        identifier_url = identifier_match.group(1) if identifier_match else None
-        wikidata_id = None
-        wikipedia_id = None
-        wikipedia_title = None
-        if identifier_url is not None:
-            wikidata_id = Annotation.get_wikidata_id_from_url(identifier_url)
-            if wikidata_id in wikipedia_titles_and_ids:
-                wikipedia_title = wikipedia_titles_and_ids[wikidata_id][0]
-                wikipedia_id = wikipedia_titles_and_ids[wikidata_id][1]
-            
-        return Annotation(offset, end, wikidata_id,
-            wikipedia_page_id = wikipedia_id,
-            wikipedia_page_title = wikipedia_title,
-            grobid_tag=grobid_tag
-        )
         
 # %%

@@ -52,29 +52,4 @@ class Corpus:
             self.name,
             [d.__deepcopy__() for d in self.documents],
         )
-    @staticmethod
-    def inception_from_directory(
-            name,
-            dir_path,
-            inception_user_name,
-            wikipedia_page_titles_and_ids_language = None,
-            **document_inception_from_file_kwargs
-        ) -> Corpus:
-
-        documents_directories = listdir(dir_path)
-        documents = [
-            Document.inception_from_file(
-                path.join(dir_path,dd,inception_user_name+".xmi"),
-                dd,
-                **document_inception_from_file_kwargs
-            ) for dd in documents_directories
-            if path.isdir(path.join(dir_path,dd))
-        ]
-
-        corpus = Corpus(name, documents)
-        if wikipedia_page_titles_and_ids_language is not None:
-            corpus.set_annotations_wikipedia_page_titles_and_ids(wikipedia_page_titles_and_ids_language)
-
-        return corpus
-
 # %%

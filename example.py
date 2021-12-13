@@ -43,5 +43,5 @@ inception_tagset_tag_str = '<type2:TagsetDescription xmi:id="1780" sofa="1" begi
 inception_import_folder = "../inception-import-xml/"
 for d in corpus.documents:
     print(f"doing Document  {d.name}")
-    d.inception_to_xml_file(inception_import_folder, force_single_sentence=True, tagset_tag_str=inception_tagset_tag_str, tag_name="custom:Entityfishinglayer", identifier_attribute_name="wikidataidentifier")
+    inception.document_to_xml_file(d, inception_import_folder, force_single_sentence=True, tagset_tag_str=inception_tagset_tag_str, tag_name="custom:Entityfishinglayer", identifier_attribute_name="wikidataidentifier")
 # %%
