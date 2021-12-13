@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from .Annotation import Annotation
 from .Corpus import Corpus
 from .Document import Document
-
+from .utils import wikidata_entity_base_url
 
 # Annotation
 # ==============================================
@@ -17,7 +17,7 @@ def annotation_to_xml_tag(annotation:Annotation, include_grobid_tag=False):
     length_tag.text = str(annotation.length) 
     if annotation.wikidata_entity_id is not None:
         wikidata_id_tag = ET.SubElement(annotation_tag, "wikidataId") 
-        wikidata_id_tag.text = annotation.wikidata_entity_base_url+str(annotation.wikidata_entity_id)
+        wikidata_id_tag.text = wikidata_entity_base_url+str(annotation.wikidata_entity_id)
     if annotation.wikipedia_page_title is not None:
         wikipedia_title_tag = ET.SubElement(annotation_tag, "wikiName") 
         wikipedia_title_tag.text = str(annotation.wikipedia_page_title)
