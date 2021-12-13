@@ -1,3 +1,4 @@
+from os import path
 
 from lxml import etree
 
@@ -34,7 +35,7 @@ entity_fishing_corpus_rawtext_folder = path.join(entity_fishing_corpus_folder, "
 
 with open(entity_fishing_annotation_output_file) as entity_fishing_xml_file:
     entity_fishing_xml_root = etree.parse(entity_fishing_xml_file).getroot()
-    corpus = Corpus.entity_fishing_from_tag_and_corpus(entity_fishing_xml_root, entity_fishing_corpus_rawtext_folder)
+    corpus = entity_fishing.corpus_from_tag_and_corpus(entity_fishing_xml_root, entity_fishing_corpus_rawtext_folder)
 # %%
 
 inception_tagset_tag_str = '<type2:TagsetDescription xmi:id="1780" sofa="1" begin="0" end="0" layer="webanno.custom.Entityfishinglayer" name="Grobid-NER" input="false"/>'

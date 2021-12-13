@@ -31,22 +31,6 @@ class Corpus:
             for a in d.annotations:
                 a.set_wikipedia_title_and_id(language, wikipedia_page_titles_and_ids)
 
-    def entity_fishing_to_xml_tag(self, **document_kwargs):
-        corpus_tag = ET.Element(self.name+".entityAnnotation")
-        for d in self.documents:
-            corpus_tag.append(d.entity_fishing_to_xml_tag(**document_kwargs))
-        return corpus_tag
-
-    def entity_fishing_to_xml_file(self, filepath, **document_kwargs):
-        intro_str = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>'
-        corpus_tag = self.entity_fishing_to_xml_tag(**document_kwargs)
-
-        ET.ElementTree(corpus_tag).write(filepath, encoding="utf-8")
-        with open(filepath, "r", encoding="utf-8") as file:
-            content = file.read()
-        with open(filepath, "w", encoding="utf-8") as file:
-            file.write(intro_str+"\n"+content)
-
     def clef_hipe_scorer_to_conllu_tsv(self, filepath, spacy_nlp, **document_kwargs):
         doc_tsv_separator = "\n"+(2*"									\n")
         alphabetic_ordered_docs = sorted(self.documents, key= lambda d: d.name)
@@ -57,12 +41,6 @@ class Corpus:
             file.write(tsv_content)
         return tsv_content
 
-    @staticmethod
-    def entity_fishing_from_tag_and_corpus(ef_xml_root_tag, corpus_folder = None) -> Corpus:
-        """Returns a Corpus object from a lxml.etree tag (the root of an EF evaluation XML output) and the EF corpus folder"""
-        name = ef_xml_root_tag.tag.replace(".entityAnnotation", "")
-        document_tags = ef_xml_root_tag.findall("document")
-        return Corpus(name, [Document.entity_fishing_from_tag(t, corpus_folder) for t in document_tags])
     def __repr__(self):
         return get_attributes_string(
             "Corpus",

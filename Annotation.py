@@ -7,7 +7,6 @@ from warnings import warn
 
 from pandas import isnull
 from spacy.tokens import Token
-import xml.etree.ElementTree as ET
 
 from .utils import wikidata_entity_base_url, get_attributes_string, inception_being_regex, inception_end_regex
 from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
@@ -102,29 +101,7 @@ class Annotation:
         )
     def __deepcopy__(self) -> Annotation:
         return self.__copy__()
-    def entity_fishing_to_xml_tag(self, include_grobid_tag=False):
-        annotation_tag = ET.Element("annotation")
-        offset_tag = ET.SubElement(annotation_tag, "offset")
-        offset_tag.text = str(self.start)
-        length_tag = ET.SubElement(annotation_tag, "length")
-        length_tag.text = str(self.length) 
-        if self.wikidata_entity_id is not None:
-            wikidata_id_tag = ET.SubElement(annotation_tag, "wikidataId") 
-            wikidata_id_tag.text = wikidata_entity_base_url+str(self.wikidata_entity_id)
-        if self.wikipedia_page_title is not None:
-            wikipedia_title_tag = ET.SubElement(annotation_tag, "wikiName") 
-            wikipedia_title_tag.text = str(self.wikipedia_page_title)
-        if self.wikipedia_page_id is not None:
-            wikipedia_id_tag = ET.SubElement(annotation_tag, "wikipediaId")
-            wikipedia_id_tag.text = str(self.wikipedia_page_id)
-        if self.mention is not None:
-            mention_tag = ET.SubElement(annotation_tag, "mention")
-            mention_tag.text = self.mention
-        if include_grobid_tag and self.grobid_tag is not None:
-            grobid_tag_tag = ET.SubElement(annotation_tag, "grobidTag")
-            grobid_tag_tag.text = self.grobid_tag
-        return annotation_tag
-    
+
     def spacy_get_tokens(self, spacy_doc) -> Sequence[Token]:
         #print(f"A.spacy_get_tokens() for {self}")
         tokens = [t for t in spacy_doc if (self.start <= t.idx < self.end)]
@@ -139,30 +116,6 @@ class Annotation:
         if (wikidata_url is not None) and wikidata_url!="null":
             return wikidata_url.replace(wikidata_entity_base_url, "") 
         return None
-
-    @staticmethod
-    def entity_fishing_from_tag(ef_xml_annotation_tag) -> Annotation:
-        """Parses an annotation from an lxml.etree.parse(...) tag
-        
-        <annotation>
-			<mention>14.1</mention>
-			<wikiName>14 und 1 endlos</wikiName>
-			<wikidataId>http://www.wikidata.org/entity/Q7468888</wikidataId>
-			<wikipediaId>3677337</wikipediaId>
-			<offset>0</offset>
-			<length>4</length>
-		</annotation>
-        """
-        offset = int(ef_xml_annotation_tag.find("offset").text)
-        length = int(ef_xml_annotation_tag.find("length").text)
-        mention = ef_xml_annotation_tag.find("mention").text
-        wikidata_url = ef_xml_annotation_tag.find("wikidataId")
-        wikidata_url = wikidata_url.text if wikidata_url is not None else None
-        wikipedia_page_id = ef_xml_annotation_tag.find("wikipediaId")
-        wikipedia_page_id = wikipedia_page_id.text if wikipedia_page_id is not None else None
-        wikipedia_page_title = ef_xml_annotation_tag.find("wikiName")
-        wikipedia_page_title = wikipedia_page_title.text if wikipedia_page_title is not None else None
-        return Annotation(offset, offset+length, None, wikipedia_page_id, wikipedia_page_title, wikidata_url, mention)
     @staticmethod
     def inception_from_tag_string(
             tag_string,

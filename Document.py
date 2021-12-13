@@ -122,11 +122,6 @@ class Document:
         self.annotations = [a for a in self.annotations if nesting_levels[a]==0]
     def filter_annotations(self, filter):
         self.annotations = [a for a in self.annotations if filter(a)]
-    def entity_fishing_get_text_from_corpus_folder(self, corpus_folder):
-        text_file_path = path.join(corpus_folder, self.name) if corpus_folder else self.name
-        with open(text_file_path) as f:
-                self.text = f.read()
-                return self.text
     def __repr__(self):
         return get_attributes_string("Document",self.__dict__)
     def __deepcopy__(self) -> Document:
@@ -135,12 +130,6 @@ class Document:
             [a.__deepcopy__() for a in self.annotations],
             self.text
         )
-    def entity_fishing_to_xml_tag(self, **annotation_kwargs):
-        document_tag = ET.Element("document")
-        document_tag.set("docName", self.name)
-        for a in self.annotations:
-            document_tag.append(a.entity_fishing_to_xml_tag(**annotation_kwargs))
-        return document_tag
     
     def spacy_to_doc(self, spacy_nlp) -> Doc:
         """Transforms the Document into a spacy doc, adds annotations to tokens."""
@@ -201,17 +190,6 @@ class Document:
         with open(path.join(folder,filename), "w") as outfile:
             outfile.write(self.inception_to_xml_string(**inception_to_xml_string_kwargs))
     
-    @staticmethod
-    def entity_fishing_from_tag(ef_xml_document_tag, corpus_folder = None) -> Document:
-        """Returns a Document from a lxml etree entity-fishing document tag"""
-        annotations_tags = ef_xml_document_tag.findall("annotation")
-        doc = Document(
-            ef_xml_document_tag.attrib["docName"],
-            [Annotation.entity_fishing_from_tag(t) for t in annotations_tags]
-        )
-        if corpus_folder:
-            doc.entity_fishing_get_text_from_corpus_folder(corpus_folder)
-        return doc
     @staticmethod
     def inception_from_string(name, document_string, named_entity_tag_name="custom:Entityfishinglayer", text_tag_name="cas:Sofa", **named_entity_parser_kwargs) -> Document:
         named_entity_tag_regex = "<"+named_entity_tag_name+r"\W.+?/>"
