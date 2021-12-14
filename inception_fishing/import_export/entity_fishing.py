@@ -2,10 +2,10 @@ from os import path
 
 import xml.etree.ElementTree as ET
 
-from .Annotation import Annotation
-from .Corpus import Corpus
-from .Document import Document
-from .utils import wikidata_entity_base_url
+from ..Annotation import Annotation
+from ..Corpus import Corpus
+from ..Document import Document
+from ..utils import wikidata_entity_base_url
 
 # Annotation
 # ==============================================

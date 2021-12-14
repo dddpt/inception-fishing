@@ -2,9 +2,9 @@ from os import path, listdir
 
 import re
 
-from .Annotation import Annotation
-from .Corpus import Corpus
-from .Document import Document
+from ..Annotation import Annotation
+from ..Corpus import Corpus
+from ..Document import Document
 
 
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'

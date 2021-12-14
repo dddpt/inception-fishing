@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from typing import Dict, Sequence
 
-from .Annotation import Annotation
-from .Corpus import Corpus
-from .Document import Document
+from ..Annotation import Annotation
+from ..Corpus import Corpus
+from ..Document import Document
 
 # Annotation
 # ==============================================

@@ -1,9 +1,9 @@
 
 from spacy.tokens import Token
 
-from .Annotation import Annotation
-from .Corpus import Corpus
-from .Document import Document
+from ..Annotation import Annotation
+from ..Corpus import Corpus
+from ..Document import Document
 from .spacy import document_to_spacy_doc
 
 default_tsv_col_to_token_extension = {

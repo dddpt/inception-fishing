@@ -3,9 +3,9 @@ from warnings import warn
 
 from spacy.tokens import Doc, Token
 
-from .Annotation import Annotation
-from .Corpus import Corpus
-from .Document import Document
+from ..Annotation import Annotation
+from ..Corpus import Corpus
+from ..Document import Document
 
 
 # Annotation
