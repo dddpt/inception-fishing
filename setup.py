@@ -7,7 +7,7 @@ setup(
     url='https://github.com/dddpt/inception-fishing',
     author='Didier Dupertuis',
     license='Apache License 2.0',
-    packages=['inception_fishing', 'inception_fishing.wiki'],
+    packages=['inception_fishing', 'inception_fishing.wiki', 'inception_fishing.import_export'],
     install_requires=[
         'requests>=2.22.0',
         'lxml>=4.5.0',
