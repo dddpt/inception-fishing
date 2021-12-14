@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import re
-from typing import Sequence
+from typing import Sequence, Dict
 from warnings import warn
 
 from .Annotation import Annotation
@@ -15,10 +15,11 @@ from .utils import get_attributes_string
 
 
 class Document:
-    def __init__(self, name:str, annotations, text = ""):
+    def __init__(self, name:str, annotations, text = "", extra_fields=dict()):
         self.name:str = name
         self.annotations:Sequence[Annotation] = annotations
         self.text:str = text
+        self.extra_fields:Dict = extra_fields
     
     def replace_span(self, start, end, replacement):
         """Replaces given span in Document text

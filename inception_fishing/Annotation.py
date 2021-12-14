@@ -5,8 +5,6 @@ import re
 from typing import TYPE_CHECKING
 from warnings import warn
 
-from pandas import isnull
-
 from .utils import wikidata_entity_base_url, get_attributes_string
 from .wiki.wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 if TYPE_CHECKING:
@@ -53,21 +51,7 @@ class Annotation:
     def wikidata_entity_url(self, new_url):
         self.wikidata_entity_id = Annotation.get_wikidata_id_from_url(new_url)
     def set_mention(self, document:Document):
-        self.mention = document.text[self.start:self.end]
-    def set_wikipedia_title_and_id(self, language, wikipedia_titles_and_ids=None):
-        if wikipedia_titles_and_ids is None:
-            wikipedia_titles_and_ids = get_wikipedia_page_titles_and_ids_from_wikidata_ids([self.wikidata_entity_id], [language])
-        annotation_row = wikipedia_titles_and_ids.loc[
-            (wikipedia_titles_and_ids.wikidata_id==self.wikidata_entity_id) &
-            (wikipedia_titles_and_ids.language==language)
-        ]
-        if annotation_row.shape[0]>=1:
-            self.wikipedia_page_title = annotation_row.wikipedia_title.values[0]
-            if self.wikipedia_page_title=="null" or isnull(self.wikipedia_page_title):
-                self.wikipedia_page_title = None
-            self.wikipedia_page_id = annotation_row.wikipedia_id.values[0]
-            if self.wikipedia_page_id=="null" or isnull(self.wikipedia_page_title):
-                self.wikipedia_page_id = None            
+        self.mention = document.text[self.start:self.end]         
     def __hash__(self):
         return hash((self.start, self.end, self.wikidata_entity_id, self.grobid_tag))
     def __eq__(self, other):

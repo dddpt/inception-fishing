@@ -5,6 +5,7 @@ import re
 from ..Annotation import Annotation
 from ..Corpus import Corpus
 from ..Document import Document
+from . import wikipedia
 
 
 INCEPTION_DEFAULT_TAGSET_TAG_STR = '<type2:TagsetDescription xmi:id="8999" sofa="1" begin="0" end="0" layer="de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity" name="Named Entity tags" input="false"/>'
@@ -146,6 +147,7 @@ def corpus_from_directory(
 
     corpus = Corpus(name, documents)
     if wikipedia_page_titles_and_ids_language is not None:
-        corpus.set_annotations_wikipedia_page_titles_and_ids(wikipedia_page_titles_and_ids_language)
+        #corpus.set_annotations_wikipedia_page_titles_and_ids(wikipedia_page_titles_and_ids_language)
+        wikipedia.corpus_set_annotations_page_titles_and_ids(corpus, None, wikipedia_page_titles_and_ids_language)
 
     return corpus
