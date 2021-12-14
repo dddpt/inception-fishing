@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from .Document import Document
 from .utils import get_attributes_string
-from .wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
+from wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 
 # %%
 
