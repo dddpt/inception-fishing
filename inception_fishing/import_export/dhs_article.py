@@ -10,18 +10,17 @@ from ..Document import Document
 # Annotation
 # ==============================================
 
-def annotations_from_dhs_article():
-    pass
 
 # Documents
 # ==============================================
 
 def document_from_dhs_article(
     dhs_article,
-    dhs_wikidata_wikipedia_links_dict:Dict[str,Dict]|None = None,
-    wikipedia_page_name_language = "fr",
     p_text_blocks_separator = "\n",
     non_p_text_blocks_separator = "\n",
+    include_text_links_annotations=True,
+    include_title_annotations=True,
+    replace_initial_from_dhs_article=True
 ):
     """Creates a document from a dhs_article annotating text blocks and text_links 
     
@@ -47,8 +46,6 @@ def document_from_dhs_article(
     - annotations for text blocks with extra_fields "dhs_type"->"text_block" and "dhs_html_tag"->html tag name
     - annotations for text links with extra_fields "dhs_type"->"text_link", "dhs_id"->dhs_id and "dhs_href"->internal dhs link
     """
-    if dhs_wikidata_wikipedia_links_dict is None:
-        dhs_wikidata_wikipedia_links_dict=dict()
     
     annotations:Sequence[Annotation] = []
     dhs_article_id_from_url_regex = re.compile(r"(fr|de|it)/articles/(\d+)/")
@@ -61,41 +58,44 @@ def document_from_dhs_article(
         annotations.append(Annotation(
             len(whole_text),
             len(new_whole_text),
-            extra_fields = {"dhs_type": "text_block", "dhs_html_tag": tag}
+            extra_fields = {"dhs_type": "text_block", "dhs_html_tag": tag, "origin": "dhs_article_text_block"}
         ))
         if tag =="p":
             whole_text = new_whole_text+p_text_blocks_separator
         else:
             whole_text = new_whole_text+non_p_text_blocks_separator
+    
+    document = Document(dhs_article.title, annotations, whole_text)
 
-    # assembling text links as annotations with wikidata ids
-    text_links_per_blocks = dhs_article.parse_text_links()
-    for i, text_links in enumerate(text_links_per_blocks):
-        text_block_start = annotations[i].start
-        for text_link in text_links:
-            start, end, mention, href = text_link.values()
-            # get text link correspondance in wikidata & wikipedia (if present)
-            wikidata_entity_url = None
-            wikipedia_page_title = None
-            dhs_id_match = dhs_article_id_from_url_regex.search(href)
-            if dhs_id_match:
-                dhs_id = dhs_id_match.group(2)
-                wikidata_entry = dhs_wikidata_wikipedia_links_dict.get(dhs_id)
-                if wikidata_entry:
-                    wikidata_entity_url = wikidata_entry["item"]
-                    wikidata_entity_url = wikidata_entity_url if wikidata_entity_url!="" else None
-                    wikipedia_page_title = wikidata_entry["name"+wikipedia_page_name_language]
-                    wikipedia_page_title = wikipedia_page_title if wikipedia_page_title!="" else None
-            annotations.append(Annotation(
-                text_block_start+start,
-                text_block_start+end,
-                wikidata_entity_url = wikidata_entity_url,
-                wikipedia_page_title = wikipedia_page_title,
-                mention = mention,
-                extra_fields={"dhs_type": "text_link", "dhs_href": href, "dhs_id": dhs_id}
-            ))
-            
-    return Document(dhs_article.title, annotations, whole_text)
+    if include_text_links_annotations:
+        # assembling text links as annotations with wikidata ids
+        text_links_per_blocks = dhs_article.parse_text_links()
+        dhs_article.add_wikidata_wikipedia_to_text_links()
+        for i, text_links in enumerate(text_links_per_blocks):
+            text_block_start = document.annotations[i].start
+            for text_link in text_links:
+                start = text_link["start"]
+                end = text_link["end"]
+                mention = text_link["mention"]
+                href = text_link["href"]
+                # get text link correspondance in wikidata & wikipedia (if present)
+                dhs_id_match = dhs_article_id_from_url_regex.search(href)
+                if dhs_id_match:
+                    dhs_id = dhs_id_match.group(2)
+                    document.annotations.append(Annotation(
+                        text_block_start+start,
+                        text_block_start+end,
+                        wikidata_entity_url = text_link.get("wikidata_url"),
+                        wikipedia_page_title = text_link.get("wikipedia_page_title"),
+                        mention = mention,
+                        extra_fields={"dhs_type": "text_link", "dhs_href": href, "dhs_id": dhs_id, "origin": "dhs_article_text_links"}
+                    ))
+    
+    if replace_initial_from_dhs_article:
+        document_annotate_title_from_dhs_article(document, dhs_article)
+    if include_title_annotations:
+        document_annotate_title_from_dhs_article(document, dhs_article)
+    return document
 
 
 def document_replace_initial_from_dhs_article(document:Document, dhs_article):
@@ -105,15 +105,16 @@ def document_replace_initial_from_dhs_article(document:Document, dhs_article):
         return []
 
 def document_annotate_title_from_dhs_article(document:Document, dhs_article):
-    wikidata_id, wikipedia_page_title, wiki_links = dhs_article.get_wikidata_links()
+    """mostly works after document_replace_initial_from_dhs_article"""
+    wikidata_url, wikipedia_page_title, wiki_links = dhs_article.get_wikidata_links()
     new_annotations = []
     for match in re.finditer(dhs_article.title, document.text):
         start, end = match.span()
         new_annotations.append(Annotation(
             start,
             end,
-            wikidata_entity_id=wikidata_id,
-            wikipedia_page_id=None, # TODO TODO TODO TODO TODO TODO TODO TODO TODO
+            wikidata_entity_url=wikidata_url,
+            wikipedia_page_id=None,
             wikipedia_page_title=wikipedia_page_title,
             mention=document.text[start:end],
             extra_fields={
