@@ -74,7 +74,7 @@ class Document:
         incremental_matches = []
         while match is not None:
             start, end = match.span()
-            incremental_matches.append((start, self.text[start:end]))
+            #incremental_matches.append((start, self.text[start:end]))
             incremental_matches.append(self.replace_span(start, end, replacement))
             match = re.search(to_replace_regex, self.text)
         return incremental_matches

@@ -10,6 +10,9 @@ from ..Document import Document
 # Annotation
 # ==============================================
 
+def annotations_from_dhs_article():
+    pass
+
 # Documents
 # ==============================================
 
@@ -93,6 +96,32 @@ def document_from_dhs_article(
             ))
             
     return Document(dhs_article.title, annotations, whole_text)
+
+
+def document_replace_initial_from_dhs_article(document:Document, dhs_article):
+    if dhs_article.initial is not None:
+        return document.replace_regex(dhs_article.initial+r"\.", dhs_article.title)
+    else:
+        return []
+
+def document_annotate_title_from_dhs_article(document:Document, dhs_article):
+    wikidata_id, wikipedia_page_title, wiki_links = dhs_article.get_wikidata_links()
+    new_annotations = []
+    for match in re.finditer(dhs_article.title, document.text):
+        start, end = match.span()
+        new_annotations.append(Annotation(
+            start,
+            end,
+            wikidata_entity_id=wikidata_id,
+            wikipedia_page_id=None, # TODO TODO TODO TODO TODO TODO TODO TODO TODO
+            wikipedia_page_title=wikipedia_page_title,
+            mention=document.text[start:end],
+            extra_fields={
+                "origin": "document_annotate_title_from_dhs_article"
+            }
+        ))
+    document.annotations += new_annotations
+    return new_annotations
 
 
 

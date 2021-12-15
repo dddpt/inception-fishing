@@ -188,7 +188,8 @@ def document_send_request(document:Document, language:str, entity_fishing_base_u
         raise Error(
             f"inception_fishing.entity_fishing.document_send_request() Non 200 response code. "+
             f"Unable to connect to entity-fishing at url '{entity_fishing_disambiguate_url}'.\n"+
-            f"Response code: {entity_fishing_resp.status_code}\nResponse content:\n{entity_fishing_resp.content}"
+            f"Response code: {entity_fishing_resp.status_code}\nResponse content:\n{entity_fishing_resp.content}"+
+            f"Sent JSON query:\n{json_query}"
         )
     return json.loads(entity_fishing_resp.content)
 
