@@ -15,7 +15,7 @@ inception_end_regex=re.compile(r'end="(\d+)"')
 
 
 def correct_inception_name_encoding_errors(name):
-        encoding_errors = {"├д": "ä", "├╝": "ü"}
+        encoding_errors = {"├д": "ä", "├╝": "ü", "├й": "é"}
         for err, corr in encoding_errors.items():
             name = name.replace(err, corr)
         return name
