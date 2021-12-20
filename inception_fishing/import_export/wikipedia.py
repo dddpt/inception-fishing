@@ -6,7 +6,7 @@ from ..Annotation import Annotation
 from ..Corpus import Corpus
 from ..Document import Document
 from ..utils import wikidata_entity_base_url
-from ..wiki.wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
+from .get_wikipedia_page_titles_and_ids_from_wikidata_ids import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 
 # Annotation
 # ==============================================
