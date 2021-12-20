@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from warnings import warn
 
 from .utils import wikidata_entity_base_url, get_attributes_string
-from .wiki.wiki import get_wikipedia_page_titles_and_ids_from_wikidata_ids
 if TYPE_CHECKING:
     from .Document import Document
 
