@@ -147,24 +147,24 @@ def document_to_json_request(document:Document, language, include_entities=True,
     """
     entities = []
     if include_entities:
-        entities = [annotation_to_json(a) for a in  document.annotations]
+        entities = [annotation_to_json(a, as_dict=True) for a in  document.annotations]
         #print(f"entities middle len: {len(entities)}")
         entities = [e for e in entities if e is not None]
     #print(f"ef.document_to_json_request() \ninclude_entities: {include_entities}\ndocument.annotations:\n{document.annotations}\nentities:\n{entities}\n------------------------------")
     json_query = {
         "text": document.text,
-        "shortText": "",
-        "termVector": [],
+        #"shortText": "",
+        #"termVector": [],
         "language": {
             "lang": language
         },
         "entities": entities,
-        "mentions": [
-            "ner",
-            "wikipedia"
-        ],
-        "nbest": False,
-        "sentence": False
+        #"mentions": [
+        #    "ner",
+        #    "wikipedia"
+        #],
+        #"nbest": False,
+        #"sentence": False
     }
     for k,v in query_kwargs.items():
         if k not in non_query_kwargs:
