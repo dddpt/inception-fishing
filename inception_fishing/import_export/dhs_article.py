@@ -140,6 +140,11 @@ def document_get_text_block_annotations(document:Document):
     text_blocks.sort(key = lambda x: x.start)
     return text_blocks
 
+def document_get_entity_fishing_annotations(document:Document):
+    entity_fishing_annotations = [a for a in document.annotations if a.extra_fields.get("origin")==ANNOTATION_ORIGIN_ENTITY_FISHING]
+    entity_fishing_annotations.sort(key = lambda x: x.start)
+    return entity_fishing_annotations
+
 def document_reintegrate_annotations_into_dhs_article(document:Document, dhs_article):
     """add annotations back into dhs_article.text_links
     
@@ -200,11 +205,15 @@ def document_reintegrate_annotations_into_dhs_article(document:Document, dhs_art
 # DhsArticle
 # ==============================================
 
-def link_entities(dhs_article, **entity_linking_kwargs):
+def link_entities(dhs_article, verbose=True, **entity_linking_kwargs):
     """Does the whole process of sending a dhs_article through entity_fishing and reintegrating the obtained annotations
     
     Modify article in place, returns it anyway
     """
+
+    if verbose:
+        print(f"Parsing article {dhs_article.id} {dhs_article.title} in {dhs_article.language}. ", end = '')
+
     dhs_article.parse_text_blocks()
     dhs_article.parse_text_links()
     dhs_article.add_wikidata_url_wikipedia_page_title()
@@ -214,7 +223,14 @@ def link_entities(dhs_article, **entity_linking_kwargs):
     document_set_annotations_page_titles_and_ids(d, dhs_article.language)
     linked_doc = document_named_entity_linking(d, dhs_article.language, **entity_linking_kwargs)
 
+    if verbose:
+        print(f"Found {len(document_get_entity_fishing_annotations(linked_doc))} annotations. ", end = '')
+    
+
     document_reintegrate_annotations_into_dhs_article(linked_doc, dhs_article)
+
+    if verbose:
+        print(f"Reintegration as text_links done")
     return dhs_article
 
 
