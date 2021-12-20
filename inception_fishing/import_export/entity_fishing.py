@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from ..Annotation import Annotation
 from ..Corpus import Corpus
 from ..Document import Document
-from ..utils import wikidata_entity_base_url
+from ..utils import wikidata_entity_base_url, ANNOTATION_ORIGIN_ENTITY_FISHING
 
 
 entity_fishing_default_base_url = "http://localhost:8090"
@@ -193,7 +193,7 @@ def document_send_request(document:Document, language:str, entity_fishing_base_u
         )
     return json.loads(entity_fishing_resp.content)
 
-def document_augment_from_json_response(document:Document, json_response:Dict, annotations_origin = "entity_fishing", **kwargs):
+def document_augment_from_json_response(document:Document, json_response:Dict, annotations_origin = ANNOTATION_ORIGIN_ENTITY_FISHING, **kwargs):
     """Augments a document with the annotation obtained from the entity-fishing API
 
     Adds an "entity_fishing_response" extra field to document, containing the json_response excluding its "entities" field (which is added to annotations)

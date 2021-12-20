@@ -16,7 +16,9 @@ WIKIDATA_DUPLICATE_LINKS = dict()
 
 WIKIDATA_URL_KEY = "item"
 def get_wikidata_short_id(wikidata_url):
-    return wikidata_url.replace("http://www.wikidata.org/entity/", "")
+    if wikidata_url:
+        return wikidata_url.replace("http://www.wikidata.org/entity/", "")
+    return None
 
 SPARQL_DOWNLOAD_DISCLAIMER = \
     f"A prerequisite is to have manually downloaded the result of the sparql query in file '{WIKIDATA_QUERY_FILE}' at 'https://query.wikidata.org/' " + \
