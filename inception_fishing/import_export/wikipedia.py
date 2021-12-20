@@ -33,7 +33,8 @@ def annotations_get_page_titles_and_ids(annotations:Sequence[Annotation], langua
     wikidata_ids = {
         a.wikidata_entity_id
         for a in annotations
-        if a.wikidata_entity_id is not None
+        if a.wikidata_entity_id is not None and a.wikidata_entity_id != "None" and \
+            a.wikidata_entity_id != "" and a.wikidata_entity_id != "null"
     }
     return get_wikipedia_page_titles_and_ids_from_wikidata_ids(wikidata_ids, [language])
 
