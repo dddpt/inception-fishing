@@ -6,7 +6,7 @@ from typing import Sequence, Dict
 from warnings import warn
 
 from .Annotation import Annotation
-from .utils import get_attributes_string
+from .utils import *
 
 # %%
 
@@ -39,16 +39,12 @@ class Document:
         new_text = self.text[:start] + replacement + self.text[end:]
         annotations_to_remove = set()
         for a in self.annotations:
-            #a_starts_in_replacement = (a.start >= start) and (a.start <end) 
-            #a_ends_in_replacement = (a.end > start) and (a.end > end)
-            replacement_starts_in_a = (start >= a.start) and (start < a.end) 
-            replacement_ends_in_a = (end > a.start) and (end <= a.end)
-            replacement_is_around_a = (start <= a.start and end>a.end) or (start < a.start and end>=a.end)
+            overlap_status = get_spans_overlap_status(a.start, a.end, start, end)
             # print(f"start_between: {start_between}, end_between: {end_between}")
-            if replacement_is_around_a:
+            if overlap_status==OVERLAP_IS_INCLUDED: # replacement is around annotation
                 warn(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} englobes annotation {a}. This annotation is removed from document.")
                 annotations_to_remove.add(a)
-            elif replacement_starts_in_a != replacement_ends_in_a and start!=end:
+            elif overlap_status in [OVERLAP_START, OVERLAP_END]: #replacement_starts_in_a != replacement_ends_in_a and start!=end:
                 raise Exception(f"Document.replace_span({start}, {end}, {replacement}) for doc {self.name} intersects with {a}. Text:\n{self.text}")
             else:
                 if a.start >= end:
