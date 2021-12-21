@@ -170,7 +170,7 @@ def document_reintegrate_annotations_into_dhs_article(document:Document, dhs_art
             overlap_status = get_spans_overlap_status(a.start, a.end, tb.start, tb.end)
             if overlap_status in [OVERLAP_START, OVERLAP_END, OVERLAP_INCLUDES]:
                 warn(
-                    "inception_fishing.import_export.dhs_article.document_reintegrate_annotations_into_dhs_article() problem for document '{document.name}':" + \
+                    f"inception_fishing.import_export.dhs_article.document_reintegrate_annotations_into_dhs_article() problem for document '{document.name}':" + \
                     f" annotation overlapping with text_block.\nannotation: {a}\ntext_block: {tb}"
                 )
             #if a.start >= tb.start and a.start<tb.end and \
