@@ -6,7 +6,7 @@ from typing import Dict, Sequence
 
 from ..Annotation import Annotation
 from ..Corpus import Corpus
-from ..Document import Document
+from ..Document import Document, INTERSECTION_BEHAVIOUR_REMOVE_ANNOTATION
 from ..utils import *
 
 from .entity_fishing import document_named_entity_linking
@@ -99,9 +99,10 @@ def document_from_dhs_article(
                             mention = mention,
                             extra_fields={"dhs_type": "text_link", "dhs_href": href, "dhs_id": dhs_id, "origin": ANNOTATION_ORIGIN_DHS_ARTICLE_TEXT_LINK}
                         ))
-    
+
+    document.extra_fields["initial_replacement"] = []    
     if replace_initial_from_dhs_article:
-        document_replace_initial_from_dhs_article(document, dhs_article)
+        document.extra_fields["initial_replacement"] = document_replace_initial_from_dhs_article(document, dhs_article)
     if include_title_annotations:
         document_annotate_title_from_dhs_article(document, dhs_article)
     return document
@@ -117,7 +118,7 @@ def document_annotate_title_from_dhs_article(document:Document, dhs_article):
     """mostly works after document_replace_initial_from_dhs_article"""
     wikidata_url, wikipedia_page_title, wiki_links = dhs_article.get_wikidata_links()
     new_annotations = []
-    for match in re.finditer(dhs_article.title, document.text):
+    for match in re.finditer(re.escape(dhs_article.title), document.text):
         start, end = match.span()
         skip = any(a.start==start and a.end==end and a.wikidata_entity_url==wikidata_url for a in document.annotations)
         if not skip:
@@ -226,6 +227,20 @@ def link_entities(dhs_article, verbose=True, **entity_linking_kwargs):
     if verbose:
         print(f"Found {len(document_get_entity_fishing_annotations(linked_doc))} annotations. ", end = '')
     
+    # replace initals back to title
+    #print(f"link_entities() dhsid {dhs_article.id} {dhs_article.title}, d.extra_fields['initial_replacement']={d.extra_fields['initial_replacement']}")
+    linked_doc.reverse_consecutive_replace_span(
+        d.extra_fields["initial_replacement"],
+        intersection_behaviour=INTERSECTION_BEHAVIOUR_REMOVE_ANNOTATION,
+        warn_on_annotation_removal = False
+    )
+    # if dhs_article.initial is not None:
+    #     linked_doc.replace_regex(
+    #         re.escape(dhs_article.title),
+    #         dhs_article.initial+".",
+    #         intersection_behaviour=INTERSECTION_BEHAVIOUR_REMOVE_ANNOTATION,
+    #         warn_on_annotation_removal = False
+    #     )
 
     document_reintegrate_annotations_into_dhs_article(linked_doc, dhs_article)
 
