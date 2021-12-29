@@ -89,11 +89,15 @@ class Document:
         """
         match = re.search(to_replace_regex, self.text)
         incremental_matches = []
+        search_start=0
         while match is not None:
-            start, end = match.span()
+            start, end = match.span()    
+            start += search_start
+            end += search_start
             #incremental_matches.append((start, self.text[start:end]))
             incremental_matches.append(self.replace_span(start, end, replacement, **replace_span_kwargs))
-            match = re.search(to_replace_regex, self.text)
+            search_start = start + len(replacement)
+            match = re.search(to_replace_regex, self.text[search_start:])
         return incremental_matches
     def reverse_replace_span(self, incremental_match, **replace_span_kwargs):
         """Reverse a single replace_span() call from its incremental_match return

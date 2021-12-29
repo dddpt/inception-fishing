@@ -176,13 +176,13 @@ def document_to_json_request(document:Document, language, include_entities=True,
         return json.dumps(json_query)
 
 
-def document_send_request(document:Document, language:str, entity_fishing_base_url = entity_fishing_default_base_url, include_entities=True, **query_kwargs):
+def document_send_request(document:Document, language:str, entity_fishing_base_url = entity_fishing_default_base_url, include_entities=True, entity_fishing_timeout=None ,**query_kwargs):
     """Sends the document text to a running entity-fishing service for NE linking and returns the response json.
     
     """
     entity_fishing_disambiguate_url = entity_fishing_base_url+entity_fishing_disambiguate_path
     json_query = document_to_json_request(document, language, include_entities, True, **query_kwargs)
-    entity_fishing_resp = r.post(entity_fishing_disambiguate_url, json = json_query)
+    entity_fishing_resp = r.post(entity_fishing_disambiguate_url, json = json_query, timeout=entity_fishing_timeout)
 
     if entity_fishing_resp.status_code!=200:
         raise Error(

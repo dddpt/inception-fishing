@@ -4,6 +4,8 @@ from warnings import warn
 import re
 from typing import Dict, Sequence
 
+from requests.exceptions import Timeout
+
 from ..Annotation import Annotation
 from ..Corpus import Corpus
 from ..Document import Document, INTERSECTION_BEHAVIOUR_REMOVE_ANNOTATION
@@ -53,11 +55,11 @@ def document_from_dhs_article(
     - annotations for text links with extra_fields "dhs_type"->"text_link", "dhs_id"->dhs_id and "dhs_href"->internal dhs link
     """
     
-    annotations:Sequence[Annotation] = []
     dhs_article_id_from_url_regex = re.compile(r"(fr|de|it)/articles/(\d+)/")
 
-    # assembling text blocks as annotations
+    # assembling text blocks as annotations and crfeating whole_text
     text_blocks = dhs_article.parse_text_blocks()
+    annotations:Sequence[Annotation] = []
     whole_text = ""
     for tag, text in text_blocks:
         new_whole_text = whole_text+text
@@ -70,8 +72,10 @@ def document_from_dhs_article(
             whole_text = new_whole_text+p_text_blocks_separator
         else:
             whole_text = new_whole_text+non_p_text_blocks_separator
+
     
     document = Document(dhs_article.title, annotations, whole_text)
+    
 
     if include_text_links_annotations:
         # assembling text links as annotations with wikidata ids
@@ -109,6 +113,7 @@ def document_from_dhs_article(
 
 
 def document_replace_initial_from_dhs_article(document:Document, dhs_article):
+    dhs_article.parse_identifying_initial() # reparse to ensure latest unbugged parse_identifying_initial()
     if dhs_article.initial is not None:
         return document.replace_regex(dhs_article.initial+r"\.", dhs_article.title)
     else:
@@ -206,7 +211,7 @@ def document_reintegrate_annotations_into_dhs_article(document:Document, dhs_art
 # DhsArticle
 # ==============================================
 
-def link_entities(dhs_article, verbose=True, **entity_linking_kwargs):
+def link_entities(dhs_article, verbose=True, timed_out_articles_file="timed_out_article_ids.txt", **entity_linking_kwargs):
     """Does the whole process of sending a dhs_article through entity_fishing and reintegrating the obtained annotations
     
     Modify article in place, returns it anyway
@@ -219,11 +224,16 @@ def link_entities(dhs_article, verbose=True, **entity_linking_kwargs):
     dhs_article.parse_text_links()
     dhs_article.add_wikidata_url_wikipedia_page_title()
     dhs_article.add_wikidata_wikipedia_to_text_links()
-
+    
     d = document_from_dhs_article(dhs_article)
     document_set_annotations_page_titles_and_ids(d, dhs_article.language)
-    linked_doc = document_named_entity_linking(d, dhs_article.language, **entity_linking_kwargs)
-
+    try:
+        linked_doc = document_named_entity_linking(d, dhs_article.language, **entity_linking_kwargs)
+    except Timeout:
+        print(f'EF TIMEOUT for article {dhs_article.id}, skipping it.')
+        with open(timed_out_articles_file, "a") as f:
+            f.write(dhs_article.id)
+        return None
     if verbose:
         print(f"Found {len(document_get_entity_fishing_annotations(linked_doc))} annotations. ", end = '')
     
@@ -252,5 +262,7 @@ def link_entities(dhs_article, verbose=True, **entity_linking_kwargs):
 def link_dhs_articles(dhs_articles:Sequence, **entity_linking_kwargs):
     """Generator for link_entities()"""
     for a in dhs_articles:
-        yield link_entities(a, **entity_linking_kwargs)
+        linked_article = link_entities(a, **entity_linking_kwargs)
+        if linked_article is not None:
+            yield linked_article
 
