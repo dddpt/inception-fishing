@@ -22,7 +22,7 @@ class Annotation:
             wikidata_entity_url=None,
             mention=None,
             grobid_tag=None,
-            extra_fields=dict()
+            extra_fields=None
         ):
         """Creates Annotation, end is non-inclusive"""
         self.start:int = start
@@ -34,7 +34,7 @@ class Annotation:
         self.wikipedia_page_title:str = wikipedia_page_title
         self.grobid_tag:str = grobid_tag
         self.mention:str = mention
-        self.extra_fields:dict = extra_fields
+        self.extra_fields:dict = extra_fields if extra_fields is not None else dict()
     @property
     def length(self):
         return self.end-self.start

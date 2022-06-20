@@ -16,11 +16,11 @@ INTERSECTION_BEHAVIOUR_SKIP_REPLACEMENT = "skip_replacement"
 INTERSECTION_BEHAVIOUR_REMOVE_ANNOTATION = "remove_annotation"
 
 class Document:
-    def __init__(self, name:str, annotations, text = "", extra_fields=dict()):
+    def __init__(self, name:str, annotations, text = "", extra_fields=None):
         self.name:str = name
         self.annotations:Sequence[Annotation] = annotations
         self.text:str = text
-        self.extra_fields:Dict = extra_fields
+        self.extra_fields:Dict = extra_fields if extra_fields is not None else dict()
     
     def replace_span(self, start, end, replacement, intersection_behaviour=None, warn_on_annotation_removal=True):
         """Replaces given span in Document text
