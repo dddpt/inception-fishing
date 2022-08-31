@@ -145,7 +145,11 @@ class Document:
     def filter_annotations(self, filter):
         self.annotations = [a for a in self.annotations if filter(a)]
     def __repr__(self):
-        return get_attributes_string("Document",self.__dict__)
+        repr =  f'Document({self.name}, {len(self.annotations)} annot., text="{self.text[0:100]}...", {self.extra_fields.__str__()}'
+        #attr_dict = {k:v for k,v in self.__dict__.items()}
+        #attr_dict["annotations"] = len()
+        #return get_attributes_string("Document",self.__dict__)
+        return repr
     def __deepcopy__(self) -> Document:
         return Document(
             self.name,
