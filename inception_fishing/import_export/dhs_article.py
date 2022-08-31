@@ -112,10 +112,11 @@ def document_from_dhs_article(
     return document
 
 
-def document_replace_initial_from_dhs_article(document:Document, dhs_article):
+def document_replace_initial_from_dhs_article(document:Document, dhs_article, replacement=None):
     dhs_article.parse_identifying_initial() # reparse to ensure latest unbugged parse_identifying_initial()
+    replacement = replacement if replacement is not None else dhs_article.title
     if dhs_article.initial is not None:
-        return document.replace_regex(dhs_article.initial+r"\.", dhs_article.title)
+        return document.replace_regex(dhs_article.initial+r"\.", replacement)
     else:
         return []
 
