@@ -8,4 +8,5 @@ from .inception_fishing import clef_hipe_scorer
 from .inception_fishing import dhs_article
 from .inception_fishing import grobid_ner
 from .inception_fishing import wikipedia
+from .inception_fishing import spacy
 from .inception_fishing.utils import *
